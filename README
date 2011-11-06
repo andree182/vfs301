@@ -1,0 +1,48 @@
+Introduction
+================================================================================
+
+This is a work-in-progress driver for vfs301 usb device 138a:0005 (and maybe 
+also other compatible ones - vfs300/451 perhaps?).
+
+As of now only a very basic command-line utility is ready, developed using
+stuff captured under Windows 7/x64.
+
+I didn't really reverse-engineer the protocol too much yet, so there is much
+space for improvement:
+* simplify the messages definitions (esp. the repeating sequences)
+* check which messages are really required
+* check how to blink the white/orange LEDs for wait/success/failure 
+  notifications
+* check how to properly prepare the scaner to wait for new finger (instead of
+  returning the noise half the time)
+* check how to detect which part of the scanned data is the fingeprint
+* the received data are highly distrorted depending on speed of finger - find
+  some way to normalize it (or will libfprint do it?)
+
+Distributable under GPLv2 or later.
+
+
+
+How to use
+================================================================================
+
+Currently only commandline utility is available - libfprint integration is 
+planned after major problems are dealt with and the code is cleaned up.
+
+
+Requirements:
+libusb-1.0
+
+
+Build & run:
+cd proto
+make
+./proto
+Ctrl+C
+Ctrl+Z
+kill %
+
+...yes, it's a bit flakey (wasn't really in mood yet to do it properly:-))
+
+It should spit out a few scan_*.pgm files in the current directory. The makefile
+also sets up the access rights to the usb device.
