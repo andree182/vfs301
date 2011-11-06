@@ -4,8 +4,12 @@ Introduction
 This is a work-in-progress driver for vfs301 usb device 138a:0005 (and maybe 
 also other compatible ones - vfs300/451 perhaps?).
 
+Distributable under GPLv2 or later.
+
+
 As of now only a very basic command-line utility is ready, developed using
 stuff captured under Windows 7/x64.
+
 
 I didn't really reverse-engineer the protocol too much yet, so there is much
 space for improvement:
@@ -19,14 +23,11 @@ space for improvement:
 * the received data are highly distrorted depending on speed of finger - find
   some way to normalize it (or will libfprint do it?)
 
-Distributable under GPLv2 or later.
-
-
 
 How to use
 ================================================================================
 
-Currently only commandline utility is available - libfprint integration is 
+Currently only a command line utility is available - libfprint integration is 
 planned after major problems are dealt with and the code is cleaned up.
 
 
@@ -46,3 +47,63 @@ kill %
 
 It should spit out a few scan_*.pgm files in the current directory. The makefile
 also sets up the access rights to the usb device.
+
+
+
+Protocol
+================================================================================
+
+Didn't really do any major findings about it, but so far it seems pretty simple,
+no encryption, sequence numbers or challenge-response cr..stuff whatsoever.
+
+You send some data in (you can send the same data each time, it seems), whic 
+prepares the device, and then it sends data back (which you have to acknowledge
+etc. - but still it seems the same data over and over will do).
+
+
+The image data coming back are arranged in lines of 288 bytes (200 bytes of it 
+is the real image data), have some checksums or whatever embedded, and is also 
+highly dependent on how fast you move the finger.
+
+
+For future generations / how to sniff USB under windows
+================================================================================
+
+SnoopyPro:
+
+I used snoopypro first to get the data. Under w7/64 however, the old version
+doesn't work - I had to use the one from
+
+http://libusb.6.n5.nabble.com/32-amp-64-bit-version-of-SnoopyPro-td3270266.html
+
+Additionally you need to enable kind of devel mode in windows and sign the
+"kernel modules" of snoopypro - http://www.ngohq.com/home.php?page=dseo
+seems to work nicely for this.
+
+Then you simply disable the device (in device manager), enable snooping in 
+snoopypro and reenable the device - and if still nothing happens, then also 
+restart the biometric service. Now you should get some data.
+
+However :) The newer versions of snoopypro (also the one on the web above) 
+stores stuff in some binary format that nobody seems to support - except for
+the discussion 
+http://sourceforge.net/projects/usbsnoop/forums/forum/108487/topic/3553730
+and perl scripts mentioned there.
+
+Anyhow, the data are still kind of hard to extract...
+
+
+Usblyzer:
+A far more convenient way was using http://www.usblyzer.com/. It doesn't 
+require any hacking - just install and use (for 30 days). Plus the data
+are stored in a csv, which came in handy - the scripts in logs/ use this format.
+
+
+Logs 
+================================================================================
+
+...now that you've got the data, you have to play with it.. :) If you copy the 
+csv files from usblyzer into "logs" directory, and use make.sh, you'll get some 
+"nice" pgm pictures from the captured data.
+
+The scripts of course aren't cleaned up at all...
