@@ -1,7 +1,7 @@
 /*
  * vfs301 fingerprint driver
  * 
- * Copyright (c) 2011 Andrej Krutak <andree@andree.sk>
+ * Copyright (c) 2011 Andrej Krutak <dev@andree.sk>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
