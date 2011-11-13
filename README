@@ -1,8 +1,9 @@
 Introduction
 ================================================================================
 
-This is a work-in-progress driver for vfs301 usb device 138a:0005 (and maybe 
-also other compatible ones - vfs300/451 perhaps?).
+This is a work-in-progress driver for vfs301 usb device 138a:0005. Reportedly
+it also works for 138a:0008 (vfs300), and maybe also other compatible ones - 
+vfs451 perhaps?.
 
 Distributable under GPLv2 or later.
 
@@ -36,7 +37,7 @@ libusb-1.0
 
 
 Build & run:
-cd proto
+cd cli
 make
 ./proto
 Ctrl+C

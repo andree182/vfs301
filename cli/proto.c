@@ -118,6 +118,11 @@ typedef struct {
 
 /************************** USB STUFF *****************************************/
 
+static uint16_t usb_ids_supported[][2] = {
+	{0x138a, 0x0008}, /* vfs300 */
+	{0x138a, 0x0005}, /* vfs301 */
+};
+
 static void usb_init(vfs_dev_t *dev)
 {
 	int i;
@@ -132,9 +137,15 @@ static void usb_init(vfs_dev_t *dev)
 	}
 	dev->state = STATE_INIT;
 
-	dev->devh = libusb_open_device_with_vid_pid(NULL, 0x138a, 0x0005);
+	for (i = 0; i < sizeof(usb_ids_supported) / sizeof(usb_ids_supported[0]); i++) {
+		dev->devh = libusb_open_device_with_vid_pid(
+			NULL, usb_ids_supported[i][0], usb_ids_supported[i][1]
+		);
+		if (dev->devh != NULL)
+			break;
+	}
 	if (dev->devh == NULL) {
-		fprintf(stderr, "Can't open validity device!\n");
+		fprintf(stderr, "Can't open any validity device!\n");
 		return;
 	}
 	dev->state = STATE_OPEN;
@@ -352,7 +363,7 @@ static int img_process_data(
 
 	return !finished_scan;
 #else /* SCAN_FINISH_DETECTION */
-	return 1; //Just continue until data are coming
+	return 1; //Just continue until data is coming
 #endif
 }
 
