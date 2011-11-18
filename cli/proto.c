@@ -86,7 +86,7 @@ static void proto_generate(int type, int subtype, unsigned char *data, int *len)
 		assert(0);
 		break;
 	case 0x06:
-		assert(0);
+		assert(!"Not generated");
 		break;
 	default:
 		assert(!"Unknown message type");
@@ -195,7 +195,7 @@ static unsigned char usb_send_buf[0x2000];
 		usb_send(dev, usb_send_buf, len); \
 	}
 
-#define B(x) x, sizeof(x)
+#define RAW_DATA(x) x, sizeof(x)
 
 #define IS_FP_SEQ_START(b) ((b[0] == 0x01) && (b[1] == 0xfe))
 
@@ -311,12 +311,12 @@ static void proto_process_event(vfs_dev_t *dev)
 		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 16384)
 	);
 	
-	usb_send(dev, B(vfs301_init_14));
+	usb_send(dev, RAW_DATA(vfs301_0220_02));
 	VARIABLE_ORDER(
 		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760), //seems to come always
 		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2) //0000
 	);
-	usb_send(dev, B(vfs301_next_scan_FA00));
+	usb_send(dev, RAW_DATA(vfs301_next_scan_FA00));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 }
 
@@ -331,80 +331,79 @@ void proto_init(vfs_dev_t *dev)
 	USB_SEND(0x19, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 64);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 4); //6BB4D0BC
-	usb_send(dev, B(vfs301_06_1));
+	usb_send(dev, RAW_DATA(vfs301_06_1));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x01, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
 	USB_SEND(0x1A, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_06_2));
+	usb_send(dev, RAW_DATA(vfs301_06_2));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_init_04));
+	usb_send(dev, RAW_DATA(vfs301_0220_01));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 256);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 32);
 	
 	USB_SEND(0x1A, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_06_3));
+	usb_send(dev, RAW_DATA(vfs301_06_3));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x01, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
-	usb_send(dev, B(vfs301_init_06));
+	usb_send(dev, RAW_DATA(vfs301_02D0_01));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 11648);
-	usb_send(dev, B(vfs301_init_07));
+	usb_send(dev, RAW_DATA(vfs301_02D0_02));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 53248);
-	usb_send(dev, B(vfs301_init_08));
+	usb_send(dev, RAW_DATA(vfs301_02D0_03));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 19968);
-	usb_send(dev, B(vfs301_init_09));
+	usb_send(dev, RAW_DATA(vfs301_02D0_04));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5824);
-	usb_send(dev, B(vfs301_init_10));
+	usb_send(dev, RAW_DATA(vfs301_02D0_05));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 6656);
-	usb_send(dev, B(vfs301_init_11));
+	usb_send(dev, RAW_DATA(vfs301_02D0_06));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 6656);
-	usb_send(dev, B(vfs301_init_12));
+	usb_send(dev, RAW_DATA(vfs301_02D0_07));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 832);
-	usb_send(dev, B(vfs301_12));
+	usb_send(dev, RAW_DATA(vfs301_12));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x1A, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_06_2));
+	usb_send(dev, RAW_DATA(vfs301_06_2));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_init_14));
+	usb_send(dev, RAW_DATA(vfs301_0220_02));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760);
 	
 	USB_SEND(0x1A, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_06_1));
+	usb_send(dev, RAW_DATA(vfs301_06_1));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
-	/* turns on white */
 	USB_SEND(0x1A, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_06_4));
+	usb_send(dev, RAW_DATA(vfs301_06_4));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_24));
+	usb_send(dev, RAW_DATA(vfs301_24)); /* turns on white */
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 // 	fprintf(stderr, "-------------- turned on white \n"); sleep(1);
 	
 	USB_SEND(0x01, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
-	usb_send(dev, B(vfs301_init_17));
+	usb_send(dev, RAW_DATA(vfs301_0220_03));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2368);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 36);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760);
-	usb_send(dev, B(vfs301_next_scan_FA00));
+	usb_send(dev, RAW_DATA(vfs301_next_scan_FA00));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 // 	fprintf(stderr, "-------------- turned off white\n"); sleep(1);
 	
