@@ -39,7 +39,7 @@ libusb-1.0
 Build & run:
 cd cli
 make
-./proto
+./cli
 Ctrl+C
 Ctrl+Z
 kill %

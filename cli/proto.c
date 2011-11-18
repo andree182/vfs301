@@ -27,6 +27,7 @@
 #include <libusb-1.0/libusb.h>
 
 #include "proto.h"
+#include "proto_fragments.h"
 #include <unistd.h>
 
 #define DEBUG
@@ -35,246 +36,62 @@
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 
-enum {
-	VALIDITY_DEFAULT_WAIT_TIMEOUT = 300,
-	
-	VALIDITY_SEND_ENDPOINT = 0x01,
-	VALIDITY_RECEIVE_ENDPOINT_CTRL = 0x81,
-	VALIDITY_RECEIVE_ENDPOINT_DATA = 0x82
-};
+/************************** OUT MESSAGES GENERATION ***************************/
 
-typedef struct {
-	/* context object for libusb library */
-	struct libusb_context *ctx;
-
-	/* libusb device handle for fingerprint reader */
-	struct libusb_device_handle *devh;
-
-	/* init state of the usb subsystem */
-	enum {
-		STATE_NOTHING,
-		STATE_INIT,
-		STATE_OPEN,
-		STATE_CLAIMED,
-		STATE_CONFIGURED
-	} state;
-
-	/* buffer for received data */
-	unsigned char recv_buf[0x20000];
-	int recv_len;
-	
-	/* sequence number for current send/recv transaction pair */
-	unsigned short seq;
-
-	/* The last response from the device, valid immediately after a recv() */
-	unsigned char buf[0x40];
-	int len;
-
-	/* buffer to hold raw image data frames */
-	unsigned char *img_buf;
-	int img_height;
-} vfs_dev_t;
-
-
-enum {
-	FP_FRAME_SIZE = 288,
-#ifndef OUTPUT_RAW
-	FP_LINE_WIDTH = 200,
-#else
-	FP_LINE_WIDTH = FP_FRAME_SIZE,
-#endif
-
-	FP_SUM_LINES = 3,
-	/* TODO: The following changes (seen ~60 and ~80) In that 
-	 * case we'll need to calibrate this from empty data somehow... */
-	FP_SUM_MEDIAN = 60,
-	FP_SUM_EMPTY_RANGE = 5,
-} fp_line_flag_data;
-
-typedef struct {
-	unsigned char sync_0x01;
-	unsigned char sync_0xfe;
-	
-	unsigned char counter_lo;
-	unsigned char counter_hi;
-
-	unsigned char sync_0x08[2]; // always? 0x08 0x08
-	// 0x08 | 0x18 - Looks like 0x08 marks good quality lines
-	unsigned char flag_1;
-	unsigned char sync_0x00;
-	
-	unsigned char scan[200];
-	
-	/* A offseted, stretched, inverted copy of scan... probably could
-	 * serve finger motion speed detection?
-	 * Seems to be subdivided to some 10B + 53B + 1B blocks */
-	unsigned char mirror[64];
-	
-	/* Some kind of sum of the scan, very low contrast */
-	unsigned char sum1[2];
-	unsigned char sum2[11];
-	unsigned char sum3[3];
-} fp_line_t;
-
-/************************** USB STUFF *****************************************/
-
-static uint16_t usb_ids_supported[][2] = {
-	{0x138a, 0x0008}, /* vfs300 */
-	{0x138a, 0x0005}, /* vfs301 */
-};
-
-static void usb_init(vfs_dev_t *dev)
+static void proto_generate_0B(int subtype, unsigned char *data, int *len)
 {
-	int i;
-	int r;
+	memset(data, 0, 39);
+	*len += 38;
 	
-	assert(dev->state == STATE_NOTHING);
+	data[20] = subtype;
 	
-	r = libusb_init(&dev->ctx);
-	if (r != 0) {
-		fprintf(stderr, "Failed to initialise libusb\n");
-		return;
-	}
-	dev->state = STATE_INIT;
-
-	for (i = 0; i < sizeof(usb_ids_supported) / sizeof(usb_ids_supported[0]); i++) {
-		dev->devh = libusb_open_device_with_vid_pid(
-			NULL, usb_ids_supported[i][0], usb_ids_supported[i][1]
-		);
-		if (dev->devh != NULL)
-			break;
-	}
-	if (dev->devh == NULL) {
-		fprintf(stderr, "Can't open any validity device!\n");
-		return;
-	}
-	dev->state = STATE_OPEN;
-
-	for (i = 0; i < 1000000; i++){
-		r = libusb_kernel_driver_active(dev->devh, i);
-		if (r == 1) {
-			r = libusb_detach_kernel_driver(dev->devh, 4);
-			if (r < 0)
-				fprintf(stderr, "Error detaching kernel driver!\n");
-		}
-	}
-
-	r = libusb_claim_interface(dev->devh, 0);
-	if (r != 0) {
-		fprintf(stderr, "usb_claim_interface error %d\n", r);
-		return;
-	}
-	dev->state = STATE_CLAIMED;
-
-	r = libusb_reset_device(dev->devh);
-	if (r != 0) {
-		fprintf(stderr, "Error resetting device");
-		return;
-	}
-
-	r = libusb_control_transfer(
-		dev->devh, LIBUSB_REQUEST_TYPE_STANDARD, LIBUSB_REQUEST_SET_FEATURE, 
-		1, 1, NULL, 0, VALIDITY_DEFAULT_WAIT_TIMEOUT
-	); 
-	if (r != 0) {
-		fprintf(stderr, "device configuring error %d\n", r);
-		return;
-	}
-	dev->state = STATE_CONFIGURED;
-}
-
-static void usb_deinit(vfs_dev_t *dev)
-{
-	int r;
-
-	if (dev->state == STATE_CONFIGURED) {
-		r = libusb_reset_device(dev->devh); 
-		if (r != 0)
-			fprintf(stderr, "Failed to reset device\n");
-		dev->state = STATE_CLAIMED;
-	}
-
-	if (dev->state == STATE_CLAIMED) {
-		r = libusb_release_interface(dev->devh, 0);
-		if (r != 0)
-			fprintf(stderr, "Failed to release interface (%d)\n", r);
-		dev->state = STATE_OPEN;
-	}
-
-	if (dev->state == STATE_OPEN) {
-		libusb_close(dev->devh);
-		dev->devh = NULL;
-		dev->state = STATE_INIT;
-	}
-
-	if (dev->state == STATE_INIT) {
-		libusb_exit(dev->ctx);
-		dev->ctx = NULL;
-		dev->state = STATE_NOTHING;
+	switch (subtype) {
+	case 0x04:
+		data[34] = 0x9F;
+		break;
+	case 0x05:
+		data[34] = 0xAB;
+		len++;
+		break;
+	default:
+		assert(!"unsupported");
+		break;
 	}
 }
 
-static void usb_print_packet(int dir, int rv, const unsigned char *data, int length) 
+static void proto_generate(int type, int subtype, unsigned char *data, int *len)
 {
-	int i;
-	fprintf(stderr, "%s, rv %d, len %d\n", dir ? "send" : "recv", rv, length);
-
-#ifdef PRINT_VERBOSE
-	for (i = 0; i < min(length, 128); i++) {
-		fprintf(stderr, "%.2X ", data[i]);
-		if (i % 8 == 7)
-			fprintf(stderr, " ");
-		if (i % 32 == 31)
-			fprintf(stderr, "\n");
+	*data = type;
+	*len = 1;
+	data++;
+		
+	switch (type) {
+	case 0x01:
+	case 0x04:
+		/* After cmd 0x04 is sent, a data is received on VALIDITY_RECEIVE_ENDPOINT_CTRL.
+		 * If it is 0x0000:
+		 *     additional 64B and 224B are read from _DATA, then vfs301_next_scan_FA00 is
+		 *     sent, 0000 received from _CTRL, and then continue with wait loop
+		 * If it is 0x1204:
+		 *     => reinit?
+		 */
+	case 0x17:
+	case 0x19:
+	case 0x1A:
+		break;
+	case 0x0B:
+		proto_generate_0B(subtype, data, len);
+		break;
+	case 0x02:
+		assert(0);
+		break;
+	case 0x06:
+		assert(0);
+		break;
+	default:
+		assert(!"Unknown message type");
+		break;
 	}
-#endif
-
-	fprintf(stderr, "\n");
-}
-
-
-static int usb_recv(vfs_dev_t *dev, unsigned char endpoint, int max_bytes)
-{
-	int transferred = 0;
-	
-	assert(max_bytes <= sizeof(dev->recv_buf));
-	
-	int r = libusb_bulk_transfer(
-		dev->devh, endpoint, 
-		dev->recv_buf, max_bytes,
-		&dev->recv_len, VALIDITY_DEFAULT_WAIT_TIMEOUT
-	);
-	
-#ifdef DEBUG
-	usb_print_packet(0, r, dev->recv_buf, dev->recv_len);
-#endif
-	
-	if (r < 0)
-		return r;
-	return 0;
-}
-
-static int usb_send(vfs_dev_t *dev, const unsigned char *data, int length)
-{
-	int transferred = 0;
-	
-	int r = libusb_bulk_transfer(
-		dev->devh, VALIDITY_SEND_ENDPOINT, 
-		(unsigned char *)data, length, &transferred, VALIDITY_DEFAULT_WAIT_TIMEOUT
-	);
-
-#ifdef DEBUG
-	usb_print_packet(1, r, data, length);
-#endif
-	
-	assert(r == 0);
-	
-	if (r < 0)
-		return r;
-	if (transferred < length)
-		return r;
-	
-	return 0;
 }
 
 /************************** SCAN IMAGE STUFF **********************************/
@@ -369,6 +186,15 @@ static int img_process_data(
 
 /************************** PROTOCOL STUFF ************************************/
 
+static unsigned char usb_send_buf[0x2000];
+
+#define USB_SEND(type, subtype) \
+	{ \
+		int len; \
+		proto_generate(type, subtype, usb_send_buf, &len); \
+		usb_send(dev, usb_send_buf, len); \
+	}
+
 #define B(x) x, sizeof(x)
 
 #define IS_FP_SEQ_START(b) ((b[0] == 0x01) && (b[1] == 0xfe))
@@ -402,7 +228,7 @@ static void proto_wait_for_event(vfs_dev_t *dev)
 #endif
 	
 	while (1) {
-		usb_send(dev, B(vfs301_cmd_17));
+		USB_SEND(0x17, -1);
 		assert(usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 7) == 0);
 		
 		if (memcmp(dev->recv_buf, no_event, sizeof(no_event)) == 0) {
@@ -477,7 +303,7 @@ static void proto_process_event(vfs_dev_t *dev)
 #endif
 #endif
 
-	usb_send(dev, B(vfs301_cmd_04));
+	USB_SEND(0x04, -1);
 	/* the following may come in random order, data may not come at all, don't
 	 * try for too long... */
 	VARIABLE_ORDER(
@@ -494,37 +320,37 @@ static void proto_process_event(vfs_dev_t *dev)
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 }
 
-static void proto_init(vfs_dev_t *dev)
+void proto_init(vfs_dev_t *dev)
 {
-	usb_send(dev, B(vfs301_cmd_01));
+	USB_SEND(0x01, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
-	usb_send(dev, B(vfs301_init_00));
+	USB_SEND(0x0B, 0x04);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 6); //000000000000
-	usb_send(dev, B(vfs301_init_01));
+	USB_SEND(0x0B, 0x05);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 7); //00000000000000
-	usb_send(dev, B(vfs301_cmd_19));
+	USB_SEND(0x19, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 64);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 4); //6BB4D0BC
-	usb_send(dev, B(vfs301_init_02));
+	usb_send(dev, B(vfs301_06_1));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
-	usb_send(dev, B(vfs301_cmd_01));
+	USB_SEND(0x01, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
-	usb_send(dev, B(vfs301_cmd_1A));
+	USB_SEND(0x1A, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_init_03));
+	usb_send(dev, B(vfs301_06_2));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, B(vfs301_init_04));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 256);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 32);
 	
-	usb_send(dev, B(vfs301_cmd_1A));
+	USB_SEND(0x1A, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_init_05));
+	usb_send(dev, B(vfs301_06_3));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
-	usb_send(dev, B(vfs301_cmd_01));
+	USB_SEND(0x01, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
 	usb_send(dev, B(vfs301_init_06));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
@@ -547,32 +373,32 @@ static void proto_init(vfs_dev_t *dev)
 	usb_send(dev, B(vfs301_init_12));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 832);
-	usb_send(dev, B(vfs301_init_13));
+	usb_send(dev, B(vfs301_12));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
-	usb_send(dev, B(vfs301_cmd_1A));
+	USB_SEND(0x1A, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_init_03));
+	usb_send(dev, B(vfs301_06_2));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, B(vfs301_init_14));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760);
 	
-	usb_send(dev, B(vfs301_cmd_1A));
+	USB_SEND(0x1A, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_init_02));
+	usb_send(dev, B(vfs301_06_1));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	/* turns on white */
-	usb_send(dev, B(vfs301_cmd_1A));
+	USB_SEND(0x1A, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_init_15));
+	usb_send(dev, B(vfs301_06_4));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, B(vfs301_init_16));
+	usb_send(dev, B(vfs301_24));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 // 	fprintf(stderr, "-------------- turned on white \n"); sleep(1);
 	
-	usb_send(dev, B(vfs301_cmd_01));
+	USB_SEND(0x01, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
 	usb_send(dev, B(vfs301_init_17));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2368);
@@ -590,55 +416,6 @@ static void proto_init(vfs_dev_t *dev)
 	}
 }
 
-static void proto_deinit(vfs_dev_t *dev)
+void proto_deinit(vfs_dev_t *dev)
 {
-}
-
-
-/************************** GENERIC STUFF *************************************/
-
-
-static vfs_dev_t dev;
-
-static void init(vfs_dev_t *dev)
-{
-	dev->state = STATE_NOTHING;
-	dev->img_buf = malloc(0);
-	dev->img_height = 0;
-	
-	usb_init(dev);
-	proto_init(dev);
-}
-
-static void work(vfs_dev_t *dev)
-{
-}
-
-static void deinit(vfs_dev_t *dev)
-{
-	proto_deinit(dev);
-	usb_deinit(dev);
-	
-	free(dev->img_buf);
-}
-
-static void handle_signal(int sig)
-{
-	(void)sig;
-	
-	fprintf(stderr, "That was all, folks\n");
-	deinit(&dev);
-}
-
-int main (int argc, char **argv)
-{
-	signal(SIGINT, handle_signal);
-	
-	init(&dev);
-	
-	if (dev.state == STATE_CONFIGURED)
-		work(&dev);
-	
-	if (dev.state != STATE_NOTHING)
-		deinit(&dev);
 }
