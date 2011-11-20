@@ -381,8 +381,10 @@ void proto_init(vfs_dev_t *dev)
 	usb_send(dev, RAW_DATA(vfs301_06_2));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, RAW_DATA(vfs301_0220_02));
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760);
+	VARIABLE_ORDER(
+		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2), //0000
+		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760)
+	);
 	
 	USB_SEND(0x1A, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
