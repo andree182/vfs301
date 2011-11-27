@@ -137,13 +137,20 @@ static void proto_generate(int type, int subtype, unsigned char *data, int *len)
 			translate_str(vfs301_0220_03, data, len);
 			break;
 		case 0xFA00:
-			translate_str(vfs301_next_scan_FA00, data, len);
-			break;
 		case 0x2C01:
-			translate_str(vfs301_next_scan_2C01, data, len);
-			break;
 		case 0x5E01:
-			translate_str(vfs301_next_scan_5E01, data, len);
+			translate_str(vfs301_next_scan_template, data, len);
+			unsigned char *field = data + *len - (sizeof(S4_TAIL) - 1) / 2 - 4;
+			
+			assert(*field == 0xDE);
+			assert(*(field + 1) == 0xAD);
+			assert(*(field + 2) == 0xDE);
+			assert(*(field + 3) == 0xAD);
+			
+			*field = (unsigned char)((subtype >> 8) & 0xFF);
+			*(field + 1) = (unsigned char)(subtype & 0xFF);
+			*(field + 2) = *field;
+			*(field + 3) = *(field + 1);
 			break;
 		default:
 			assert(0);
