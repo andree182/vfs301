@@ -59,6 +59,34 @@ static void proto_generate_0B(int subtype, unsigned char *data, int *len)
 	}
 }
 
+#define HEX_TO_INT(c) \
+	(((c) >= '0' && (c) <= '9') ? ((c) - '0') : ((c) - 'A'))
+	
+static void translate_str(const char **srcL, unsigned char *data, int *len)
+{
+	const char *src;
+	unsigned char *dataOrig = data;
+	
+	while (*srcL != NULL) {
+		src = *srcL;
+		while (*src != '\0') {
+			assert(*src != '\0');
+			assert(*(src +1) != '\0');
+			*data = 
+				(unsigned char)((HEX_TO_INT(*src) << 4) | (HEX_TO_INT(*(src + 1))));
+
+			data++;
+			src += 2;
+		}
+		
+		srcL++;
+	}
+	
+	*len = data - dataOrig;
+	
+// 	fprintf(stderr, "CALCLEN %d\n", *len);
+}
+
 static void proto_generate(int type, int subtype, unsigned char *data, int *len)
 {
 	*data = type;
@@ -82,8 +110,45 @@ static void proto_generate(int type, int subtype, unsigned char *data, int *len)
 	case 0x0B:
 		proto_generate_0B(subtype, data, len);
 		break;
-	case 0x02:
-		assert(0);
+	case 0x02D0:
+		{
+			const char **dataLs[] = {
+				vfs301_02D0_01, 
+				vfs301_02D0_02, 
+				vfs301_02D0_03, 
+				vfs301_02D0_04, 
+				vfs301_02D0_05, 
+				vfs301_02D0_06, 
+				vfs301_02D0_07, 
+			};
+			assert((int)subtype <= (int)(sizeof(dataLs) / sizeof(dataLs[0])));
+			translate_str(dataLs[subtype - 1], data, len);
+		}
+		break;
+	case 0x0220:
+		switch (subtype) {
+		case 1:
+			translate_str(vfs301_0220_01, data, len);
+			break;
+		case 2:
+			translate_str(vfs301_0220_02, data, len);
+			break;
+		case 3:
+			translate_str(vfs301_0220_03, data, len);
+			break;
+		case 0xFA00:
+			translate_str(vfs301_next_scan_FA00, data, len);
+			break;
+		case 0x2C01:
+			translate_str(vfs301_next_scan_2C01, data, len);
+			break;
+		case 0x5E01:
+			translate_str(vfs301_next_scan_5E01, data, len);
+			break;
+		default:
+			assert(0);
+			break;
+		}
 		break;
 	case 0x06:
 		assert(!"Not generated");
@@ -311,12 +376,12 @@ static void proto_process_event(vfs_dev_t *dev)
 		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 16384)
 	);
 	
-	usb_send(dev, RAW_DATA(vfs301_0220_02));
+	USB_SEND(0x0220, 2);
 	VARIABLE_ORDER(
 		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760), //seems to come always
 		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2) //0000
 	);
-	usb_send(dev, RAW_DATA(vfs301_next_scan_FA00));
+	USB_SEND(0x0220, 0xFA00);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 }
 
@@ -340,7 +405,7 @@ void proto_init(vfs_dev_t *dev)
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, RAW_DATA(vfs301_06_2));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, RAW_DATA(vfs301_0220_01));
+	USB_SEND(0x0220, 1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 256);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 32);
@@ -352,25 +417,25 @@ void proto_init(vfs_dev_t *dev)
 	
 	USB_SEND(0x01, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
-	usb_send(dev, RAW_DATA(vfs301_02D0_01));
+	USB_SEND(0x02D0, 1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 11648);
-	usb_send(dev, RAW_DATA(vfs301_02D0_02));
+	USB_SEND(0x02D0, 2);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 53248);
-	usb_send(dev, RAW_DATA(vfs301_02D0_03));
+	USB_SEND(0x02D0, 3);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 19968);
-	usb_send(dev, RAW_DATA(vfs301_02D0_04));
+	USB_SEND(0x02D0, 4);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5824);
-	usb_send(dev, RAW_DATA(vfs301_02D0_05));
+	USB_SEND(0x02D0, 5);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 6656);
-	usb_send(dev, RAW_DATA(vfs301_02D0_06));
+	USB_SEND(0x02D0, 6);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 6656);
-	usb_send(dev, RAW_DATA(vfs301_02D0_07));
+	USB_SEND(0x02D0, 7);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 832);
 	usb_send(dev, RAW_DATA(vfs301_12));
@@ -380,7 +445,7 @@ void proto_init(vfs_dev_t *dev)
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, RAW_DATA(vfs301_06_2));
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, RAW_DATA(vfs301_0220_02));
+	USB_SEND(0x0220, 2);
 	VARIABLE_ORDER(
 		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2), //0000
 		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760)
@@ -401,11 +466,11 @@ void proto_init(vfs_dev_t *dev)
 	
 	USB_SEND(0x01, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
-	usb_send(dev, RAW_DATA(vfs301_0220_03));
+	USB_SEND(0x0220, 3);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2368);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 36);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760);
-	usb_send(dev, RAW_DATA(vfs301_next_scan_FA00));
+	USB_SEND(0x0220, 0xFA00);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 // 	fprintf(stderr, "-------------- turned off white\n"); sleep(1);
 	

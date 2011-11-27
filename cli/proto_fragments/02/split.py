@@ -64,7 +64,7 @@ def getNextBytes(amt):
 	return rv
 	
 class struct_type1:
-	header = "03000900"
+	header = TAG_3
 	footer = "04"
 	def __init__(self):
 		pass
@@ -361,11 +361,11 @@ for dataPair in datas.items():
 	assert(isEnd())
 
 	TO_STRUCT = True
-	JOIN_STR = ',\n'
+	JOIN_STR = ',\n\t'
 	
-	print "const char **%s = {\n" % (dataPair[0])
+	print "const char *%s[] = {" % (dataPair[0])
 	print res
-	print "}\n\n";
+	print "\t,NULL;\n};\n\n";
 	
 	TO_STRUCT = False
 	JOIN_STR = ''
