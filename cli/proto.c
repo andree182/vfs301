@@ -40,6 +40,10 @@
 
 static void proto_generate_0B(int subtype, unsigned char *data, int *len)
 {
+	*data = 0x0B;
+	*len = 1;
+	data++;
+	
 	memset(data, 0, 39);
 	*len += 38;
 	
@@ -60,7 +64,7 @@ static void proto_generate_0B(int subtype, unsigned char *data, int *len)
 }
 
 #define HEX_TO_INT(c) \
-	(((c) >= '0' && (c) <= '9') ? ((c) - '0') : ((c) - 'A'))
+	(((c) >= '0' && (c) <= '9') ? ((c) - '0') : ((c) - 'A' + 10))
 	
 static void translate_str(const char **srcL, unsigned char *data, int *len)
 {
@@ -83,16 +87,10 @@ static void translate_str(const char **srcL, unsigned char *data, int *len)
 	}
 	
 	*len = data - dataOrig;
-	
-// 	fprintf(stderr, "CALCLEN %d\n", *len);
 }
 
 static void proto_generate(int type, int subtype, unsigned char *data, int *len)
 {
-	*data = type;
-	*len = 1;
-	data++;
-		
 	switch (type) {
 	case 0x01:
 	case 0x04:
@@ -106,6 +104,8 @@ static void proto_generate(int type, int subtype, unsigned char *data, int *len)
 	case 0x17:
 	case 0x19:
 	case 0x1A:
+		*data = type;
+		*len = 1;
 		break;
 	case 0x0B:
 		proto_generate_0B(subtype, data, len);
