@@ -53,9 +53,9 @@ typedef struct {
 	unsigned char buf[0x40];
 	int len;
 
-	/* buffer to hold raw image data frames */
-	unsigned char *img_buf;
-	int img_height;
+	/* buffer to hold raw scanlines */
+	unsigned char *scanline_buf;
+	int scanline_count;
 } vfs_dev_t;
 
 

@@ -199,8 +199,8 @@ static void img_store(vfs_dev_t *dev)
 	f = fopen(fn, "wb");
 	assert(f != NULL);
 	
-	fprintf(f, "P5\n%d %d\n255\n", FP_LINE_WIDTH, dev->img_height);
-	fwrite(dev->img_buf, dev->img_height * FP_LINE_WIDTH, 1, f);
+	fprintf(f, "P5\n%d %d\n255\n", FP_LINE_WIDTH, dev->scanline_count);
+	fwrite(dev->scanline_buf, dev->scanline_count * FP_LINE_WIDTH, 1, f);
 	fclose(f);
 }
 #endif
@@ -221,16 +221,16 @@ static int img_process_data(
 	
 	if (first_block) {
 		last_img_height = 0;
-		dev->img_height = no_lines;
+		dev->scanline_count = no_lines;
 	} else {
-		last_img_height = dev->img_height;
-		dev->img_height += no_lines;
+		last_img_height = dev->scanline_count;
+		dev->scanline_count += no_lines;
 	}
 	
-	dev->img_buf = realloc(dev->img_buf, dev->img_height * FP_LINE_WIDTH);
-	assert(dev->img_buf != NULL);
+	dev->scanline_buf = realloc(dev->scanline_buf, dev->scanline_count * FP_LINE_WIDTH);
+	assert(dev->scanline_buf != NULL);
 	
-	for (cur_line = dev->img_buf + last_img_height * FP_LINE_WIDTH, no_nonempty = 0, i = 0; 
+	for (cur_line = dev->scanline_buf + last_img_height * FP_LINE_WIDTH, no_nonempty = 0, i = 0; 
 		i < no_lines; 
 		i++, cur_line += FP_LINE_WIDTH
 	) {

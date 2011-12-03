@@ -204,8 +204,8 @@ static vfs_dev_t dev;
 static void init(vfs_dev_t *dev)
 {
 	dev->state = STATE_NOTHING;
-	dev->img_buf = malloc(0);
-	dev->img_height = 0;
+	dev->scanline_buf = malloc(0);
+	dev->scanline_count = 0;
 	
 	usb_init(dev);
 	proto_init(dev);
@@ -220,7 +220,7 @@ static void deinit(vfs_dev_t *dev)
 	proto_deinit(dev);
 	usb_deinit(dev);
 	
-	free(dev->img_buf);
+	free(dev->scanline_buf);
 }
 
 static void handle_signal(int sig)
