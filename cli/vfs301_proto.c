@@ -547,10 +547,10 @@ void proto_init(vfs_dev_t *dev)
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 36);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760);
 	
-	fprintf(stderr, "-------------- waiting for fingerprint ------------\n");
-	
 	while (1) {
+		fprintf(stderr, "waiting for next fingerprint...\n");
 		proto_wait_for_event(dev);
+		fprintf(stderr, "reading fingerprint...\n");
 		proto_process_event(dev);
 	}
 }
