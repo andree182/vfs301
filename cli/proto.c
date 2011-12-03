@@ -18,6 +18,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#define DEBUG
+#define OUTPUT_RAW
+#define STORE_SCANS
+
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
@@ -29,10 +33,6 @@
 #include "proto.h"
 #include "proto_fragments.h"
 #include <unistd.h>
-
-#define DEBUG
-#define OUTPUT_RAW
-#define STORE_SCANS
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 
@@ -295,6 +295,9 @@ static void proto_wait_for_event(vfs_dev_t *dev)
 	const char no_event[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	const char got_event[] = {0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00};
 	
+	USB_SEND(0x0220, 0xFA00);
+	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //000000000000
+	
 #ifdef DEBUG
 	fprintf(stderr, "Entering proto_wait_for_event() loop...\n");
 #endif
@@ -304,7 +307,7 @@ static void proto_wait_for_event(vfs_dev_t *dev)
 		assert(usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 7) == 0);
 		
 		if (memcmp(dev->recv_buf, no_event, sizeof(no_event)) == 0) {
-			usleep(60000);
+			usleep(200000);
 		} else if (memcmp(dev->recv_buf, got_event, sizeof(no_event)) == 0) {
 			break;
 		} else {
@@ -388,8 +391,6 @@ static void proto_process_event(vfs_dev_t *dev)
 		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760), //seems to come always
 		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2) //0000
 	);
-	USB_SEND(0x0220, 0xFA00);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 }
 
 void proto_init(vfs_dev_t *dev)
@@ -469,7 +470,6 @@ void proto_init(vfs_dev_t *dev)
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, RAW_DATA(vfs301_24)); /* turns on white */
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-// 	fprintf(stderr, "-------------- turned on white \n"); sleep(1);
 	
 	USB_SEND(0x01, -1);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
@@ -477,9 +477,6 @@ void proto_init(vfs_dev_t *dev)
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2368);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 36);
 	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760);
-	USB_SEND(0x0220, 0xFA00);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-// 	fprintf(stderr, "-------------- turned off white\n"); sleep(1);
 	
 	fprintf(stderr, "-------------- waiting for fingerprint ------------\n");
 	
