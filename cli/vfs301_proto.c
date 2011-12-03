@@ -18,10 +18,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#define DEBUG
-#define OUTPUT_RAW
-#define STORE_SCANS
-
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
@@ -30,8 +26,8 @@
 #include <stdlib.h>
 #include <libusb-1.0/libusb.h>
 
-#include "proto.h"
-#include "proto_fragments.h"
+#include "vfs301_proto.h"
+#include "vfs301_proto_fragments.h"
 #include <unistd.h>
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
@@ -308,7 +304,7 @@ static int img_process_data(
 		i++, cur_line += FP_OUTPUT_WIDTH
 	) {
 #ifndef OUTPUT_RAW
-		memcpy(cur_line, lines[i].scan, FP_LINE_WIDTH);
+		memcpy(cur_line, lines[i].scan, FP_OUTPUT_WIDTH);
 #else
 		memcpy(cur_line, &lines[i], FP_OUTPUT_WIDTH);
 #endif

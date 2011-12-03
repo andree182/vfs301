@@ -26,12 +26,8 @@
 #include <stdlib.h>
 #include <libusb-1.0/libusb.h>
 
-#include "proto.h"
+#include "vfs301_proto.h"
 #include <unistd.h>
-
-#define DEBUG
-#define OUTPUT_RAW
-#define STORE_SCANS
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 
@@ -136,8 +132,11 @@ static void usb_deinit(vfs_dev_t *dev)
 static void usb_print_packet(int dir, int rv, const unsigned char *data, int length) 
 {
 	int i;
-	fprintf(stderr, "%s, rv %d, len %d\n", dir ? "send" : "recv", rv, length);
 
+#ifdef DEBUG
+	fprintf(stderr, "%s, rv %d, len %d\n", dir ? "send" : "recv", rv, length);
+#endif
+	
 #ifdef PRINT_VERBOSE
 	for (i = 0; i < min(length, 128); i++) {
 		fprintf(stderr, "%.2X ", data[i]);
