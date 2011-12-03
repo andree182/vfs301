@@ -188,20 +188,93 @@ static int img_is_finished_scan(fp_line_t *lines, int no_lines)
 #endif
 
 #ifdef STORE_SCANS
+static int scanline_diff(const unsigned char *scanlines, int prev, int cur)
+{
+	const unsigned char *line1 = 
+		scanlines + prev * FP_OUTPUT_WIDTH;
+	const unsigned char *line2 = 
+		scanlines + cur * FP_OUTPUT_WIDTH;
+	int i;
+	int diff;
+	
+#ifdef OUTPUT_RAW
+	/* We only need the image, not the surrounding stuff. */
+	line1 = ((fp_line_t*)line1)->scan;
+	line2 = ((fp_line_t*)line2)->scan;
+#endif
+	
+	for (diff = 0, i = 0; i < FP_WIDTH; i++) {
+		if (*line1 > *line2)
+			diff += *line1 - *line2;
+		else
+			diff += *line2 - *line1;
+		
+		line1++;
+		line2++;
+	}
+	
+	return ((diff / FP_WIDTH) > FP_LINE_DIFF_THRESHOLD);
+}
+
+/** Transform the input data to a normalized fingerprint scan */
+static unsigned char *
+	scanlines_to_img(const unsigned char *scanlines, int lines, 
+	int *output_height
+)
+{
+	int last_line;
+	int i;
+	unsigned char *output;
+	
+	assert(lines >= 1);
+	
+	output = malloc(FP_OUTPUT_WIDTH);
+	*output_height = 1;
+	memcpy(output, scanlines, FP_OUTPUT_WIDTH);
+	last_line = 0;
+	
+	/* The following algorithm is quite trivial - it just picks lines that
+	 * differ more than FP_LINE_DIFF_THRESHOLD.
+	 * TODO: A nicer approach would be to pick those lines and then do some kind 
+	 * of bi/tri-linear resampling to get the output (so that we don't get so
+	 * many false edges etc.).
+	 */
+	for (i = 1; i < lines; i++) {
+		if (scanline_diff(scanlines, last_line, i)) {
+			output = realloc(output, FP_OUTPUT_WIDTH * (*output_height + 1));
+			memcpy(
+				output + FP_OUTPUT_WIDTH * (*output_height),
+				scanlines + FP_OUTPUT_WIDTH * i,
+				FP_OUTPUT_WIDTH
+			);
+			last_line = i;
+			(*output_height)++;
+		}
+	}
+	
+	return output;
+}
+
 static void img_store(vfs_dev_t *dev)
 {
 	static int idx = 0;
 	char fn[32];
 	FILE *f;
+	unsigned char *img;
+	int height;
+	
+	img = scanlines_to_img(dev->scanline_buf, dev->scanline_count, &height);
 	
 	sprintf(fn, "scan_%02d.pgm", idx++);
 	
 	f = fopen(fn, "wb");
 	assert(f != NULL);
 	
-	fprintf(f, "P5\n%d %d\n255\n", FP_LINE_WIDTH, dev->scanline_count);
-	fwrite(dev->scanline_buf, dev->scanline_count * FP_LINE_WIDTH, 1, f);
+	fprintf(f, "P5\n%d %d\n255\n", FP_OUTPUT_WIDTH, height);
+	fwrite(img, height * FP_OUTPUT_WIDTH, 1, f);
 	fclose(f);
+	
+	free(img);
 }
 #endif
 
@@ -227,17 +300,17 @@ static int img_process_data(
 		dev->scanline_count += no_lines;
 	}
 	
-	dev->scanline_buf = realloc(dev->scanline_buf, dev->scanline_count * FP_LINE_WIDTH);
+	dev->scanline_buf = realloc(dev->scanline_buf, dev->scanline_count * FP_OUTPUT_WIDTH);
 	assert(dev->scanline_buf != NULL);
 	
-	for (cur_line = dev->scanline_buf + last_img_height * FP_LINE_WIDTH, no_nonempty = 0, i = 0; 
+	for (cur_line = dev->scanline_buf + last_img_height * FP_OUTPUT_WIDTH, no_nonempty = 0, i = 0; 
 		i < no_lines; 
-		i++, cur_line += FP_LINE_WIDTH
+		i++, cur_line += FP_OUTPUT_WIDTH
 	) {
 #ifndef OUTPUT_RAW
 		memcpy(cur_line, lines[i].scan, FP_LINE_WIDTH);
 #else
-		memcpy(cur_line, &lines[i], FP_LINE_WIDTH);
+		memcpy(cur_line, &lines[i], FP_OUTPUT_WIDTH);
 #endif
 	}
 	

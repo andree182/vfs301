@@ -60,11 +60,16 @@ typedef struct {
 
 
 enum {
+	/* Width of the scanned data in px */
+	FP_WIDTH = 200,
+	
+	/* sizeof(fp_line_t) */
 	FP_FRAME_SIZE = 288,
+	/* Width of output line */
 #ifndef OUTPUT_RAW
-	FP_LINE_WIDTH = 200,
+	FP_OUTPUT_WIDTH = FP_WIDTH,
 #else
-	FP_LINE_WIDTH = FP_FRAME_SIZE,
+	FP_OUTPUT_WIDTH = FP_FRAME_SIZE,
 #endif
 
 	FP_SUM_LINES = 3,
@@ -72,6 +77,9 @@ enum {
 	 * case we'll need to calibrate this from empty data somehow... */
 	FP_SUM_MEDIAN = 60,
 	FP_SUM_EMPTY_RANGE = 5,
+	
+	/* Minimum average difference between returned lines */
+	FP_LINE_DIFF_THRESHOLD = 15,
 } fp_line_flag_data;
 
 typedef struct {
@@ -86,7 +94,7 @@ typedef struct {
 	unsigned char flag_1;
 	unsigned char sync_0x00;
 	
-	unsigned char scan[200];
+	unsigned char scan[FP_WIDTH];
 	
 	/* A offseted, stretched, inverted copy of scan... probably could
 	 * serve finger motion speed detection?
