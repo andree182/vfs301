@@ -38,7 +38,7 @@ static uint16_t usb_ids_supported[][2] = {
 	{0x138a, 0x0005}, /* vfs301 */
 };
 
-static void usb_init(vfs_dev_t *dev)
+static void usb_init(vfs301_dev_t *dev)
 {
 	int i;
 	int r;
@@ -89,7 +89,7 @@ static void usb_init(vfs_dev_t *dev)
 
 	r = libusb_control_transfer(
 		dev->devh, LIBUSB_REQUEST_TYPE_STANDARD, LIBUSB_REQUEST_SET_FEATURE, 
-		1, 1, NULL, 0, VALIDITY_DEFAULT_WAIT_TIMEOUT
+		1, 1, NULL, 0, VFS301_DEFAULT_WAIT_TIMEOUT
 	); 
 	if (r != 0) {
 		fprintf(stderr, "device configuring error %d\n", r);
@@ -98,7 +98,7 @@ static void usb_init(vfs_dev_t *dev)
 	dev->state = STATE_CONFIGURED;
 }
 
-static void usb_deinit(vfs_dev_t *dev)
+static void usb_deinit(vfs301_dev_t *dev)
 {
 	int r;
 
@@ -151,7 +151,7 @@ static void usb_print_packet(int dir, int rv, const unsigned char *data, int len
 }
 
 
-int usb_recv(vfs_dev_t *dev, unsigned char endpoint, int max_bytes)
+int usb_recv(vfs301_dev_t *dev, unsigned char endpoint, int max_bytes)
 {
 	int transferred = 0;
 	
@@ -160,7 +160,7 @@ int usb_recv(vfs_dev_t *dev, unsigned char endpoint, int max_bytes)
 	int r = libusb_bulk_transfer(
 		dev->devh, endpoint, 
 		dev->recv_buf, max_bytes,
-		&dev->recv_len, VALIDITY_DEFAULT_WAIT_TIMEOUT
+		&dev->recv_len, VFS301_DEFAULT_WAIT_TIMEOUT
 	);
 	
 #ifdef DEBUG
@@ -172,13 +172,13 @@ int usb_recv(vfs_dev_t *dev, unsigned char endpoint, int max_bytes)
 	return 0;
 }
 
-int usb_send(vfs_dev_t *dev, const unsigned char *data, int length)
+int usb_send(vfs301_dev_t *dev, const unsigned char *data, int length)
 {
 	int transferred = 0;
 	
 	int r = libusb_bulk_transfer(
-		dev->devh, VALIDITY_SEND_ENDPOINT, 
-		(unsigned char *)data, length, &transferred, VALIDITY_DEFAULT_WAIT_TIMEOUT
+		dev->devh, VFS301_SEND_ENDPOINT, 
+		(unsigned char *)data, length, &transferred, VFS301_DEFAULT_WAIT_TIMEOUT
 	);
 
 #ifdef DEBUG
@@ -198,9 +198,9 @@ int usb_send(vfs_dev_t *dev, const unsigned char *data, int length)
 /************************** GENERIC STUFF *************************************/
 
 
-static vfs_dev_t dev;
+static vfs301_dev_t dev;
 
-static void init(vfs_dev_t *dev)
+static void init(vfs301_dev_t *dev)
 {
 	dev->state = STATE_NOTHING;
 	dev->scanline_buf = malloc(0);
@@ -210,11 +210,11 @@ static void init(vfs_dev_t *dev)
 	proto_init(dev);
 }
 
-static void work(vfs_dev_t *dev)
+static void work(vfs301_dev_t *dev)
 {
 }
 
-static void deinit(vfs_dev_t *dev)
+static void deinit(vfs301_dev_t *dev)
 {
 	proto_deinit(dev);
 	usb_deinit(dev);

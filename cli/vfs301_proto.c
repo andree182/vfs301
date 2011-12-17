@@ -171,10 +171,10 @@ static int img_is_finished_scan(fp_line_t *lines, int no_lines)
 	int j;
 	int rv = 1;
 	
-	for (i = no_lines - FP_SUM_LINES; i < no_lines; i++) {
+	for (i = no_lines - VFS301_FP_SUM_LINES; i < no_lines; i++) {
 		/* check the line for fingerprint data */
 		for (j = 0; j < sizeof(lines[i].sum2); j++) {
-			if (lines[i].sum2[j] > (FP_SUM_MEDIAN + FP_SUM_EMPTY_RANGE))
+			if (lines[i].sum2[j] > (VFS301_FP_SUM_MEDIAN + VFS301_FP_SUM_EMPTY_RANGE))
 				rv = 0;
 		}
 	}
@@ -187,9 +187,9 @@ static int img_is_finished_scan(fp_line_t *lines, int no_lines)
 static int scanline_diff(const unsigned char *scanlines, int prev, int cur)
 {
 	const unsigned char *line1 = 
-		scanlines + prev * FP_OUTPUT_WIDTH;
+		scanlines + prev * VFS301_FP_OUTPUT_WIDTH;
 	const unsigned char *line2 = 
-		scanlines + cur * FP_OUTPUT_WIDTH;
+		scanlines + cur * VFS301_FP_OUTPUT_WIDTH;
 	int i;
 	int diff;
 	
@@ -199,7 +199,7 @@ static int scanline_diff(const unsigned char *scanlines, int prev, int cur)
 	line2 = ((fp_line_t*)line2)->scan;
 #endif
 	
-	for (diff = 0, i = 0; i < FP_WIDTH; i++) {
+	for (diff = 0, i = 0; i < VFS301_FP_WIDTH; i++) {
 		if (*line1 > *line2)
 			diff += *line1 - *line2;
 		else
@@ -209,7 +209,7 @@ static int scanline_diff(const unsigned char *scanlines, int prev, int cur)
 		line2++;
 	}
 	
-	return ((diff / FP_WIDTH) > FP_LINE_DIFF_THRESHOLD);
+	return ((diff / VFS301_FP_WIDTH) > VFS301_FP_LINE_DIFF_THRESHOLD);
 }
 
 /** Transform the input data to a normalized fingerprint scan */
@@ -224,24 +224,24 @@ static unsigned char *
 	
 	assert(lines >= 1);
 	
-	output = malloc(FP_OUTPUT_WIDTH);
+	output = malloc(VFS301_FP_OUTPUT_WIDTH);
 	*output_height = 1;
-	memcpy(output, scanlines, FP_OUTPUT_WIDTH);
+	memcpy(output, scanlines, VFS301_FP_OUTPUT_WIDTH);
 	last_line = 0;
 	
 	/* The following algorithm is quite trivial - it just picks lines that
-	 * differ more than FP_LINE_DIFF_THRESHOLD.
+	 * differ more than VFS301_FP_LINE_DIFF_THRESHOLD.
 	 * TODO: A nicer approach would be to pick those lines and then do some kind 
 	 * of bi/tri-linear resampling to get the output (so that we don't get so
 	 * many false edges etc.).
 	 */
 	for (i = 1; i < lines; i++) {
 		if (scanline_diff(scanlines, last_line, i)) {
-			output = realloc(output, FP_OUTPUT_WIDTH * (*output_height + 1));
+			output = realloc(output, VFS301_FP_OUTPUT_WIDTH * (*output_height + 1));
 			memcpy(
-				output + FP_OUTPUT_WIDTH * (*output_height),
-				scanlines + FP_OUTPUT_WIDTH * i,
-				FP_OUTPUT_WIDTH
+				output + VFS301_FP_OUTPUT_WIDTH * (*output_height),
+				scanlines + VFS301_FP_OUTPUT_WIDTH * i,
+				VFS301_FP_OUTPUT_WIDTH
 			);
 			last_line = i;
 			(*output_height)++;
@@ -251,7 +251,7 @@ static unsigned char *
 	return output;
 }
 
-static void img_store(vfs_dev_t *dev)
+static void img_store(vfs301_dev_t *dev)
 {
 	static int idx = 0;
 	char fn[32];
@@ -266,8 +266,8 @@ static void img_store(vfs_dev_t *dev)
 	f = fopen(fn, "wb");
 	assert(f != NULL);
 	
-	fprintf(f, "P5\n%d %d\n255\n", FP_OUTPUT_WIDTH, height);
-	fwrite(img, height * FP_OUTPUT_WIDTH, 1, f);
+	fprintf(f, "P5\n%d %d\n255\n", VFS301_FP_OUTPUT_WIDTH, height);
+	fwrite(img, height * VFS301_FP_OUTPUT_WIDTH, 1, f);
 	fclose(f);
 	
 	free(img);
@@ -275,11 +275,11 @@ static void img_store(vfs_dev_t *dev)
 #endif
 
 static int img_process_data(
-	int first_block, vfs_dev_t *dev, const unsigned char *buf, int len
+	int first_block, vfs301_dev_t *dev, const unsigned char *buf, int len
 )
 {
-	fp_line_t *lines = (fp_line_t*)buf;
-	int no_lines = len / sizeof(fp_line_t);
+	vfs301_line_t *lines = (vfs301_line_t*)buf;
+	int no_lines = len / sizeof(vfs301_line_t);
 	int i;
 	int no_nonempty;
 	char *cur_line;
@@ -296,17 +296,17 @@ static int img_process_data(
 		dev->scanline_count += no_lines;
 	}
 	
-	dev->scanline_buf = realloc(dev->scanline_buf, dev->scanline_count * FP_OUTPUT_WIDTH);
+	dev->scanline_buf = realloc(dev->scanline_buf, dev->scanline_count * VFS301_FP_OUTPUT_WIDTH);
 	assert(dev->scanline_buf != NULL);
 	
-	for (cur_line = dev->scanline_buf + last_img_height * FP_OUTPUT_WIDTH, no_nonempty = 0, i = 0; 
+	for (cur_line = dev->scanline_buf + last_img_height * VFS301_FP_OUTPUT_WIDTH, no_nonempty = 0, i = 0; 
 		i < no_lines; 
-		i++, cur_line += FP_OUTPUT_WIDTH
+		i++, cur_line += VFS301_FP_OUTPUT_WIDTH
 	) {
 #ifndef OUTPUT_RAW
-		memcpy(cur_line, lines[i].scan, FP_OUTPUT_WIDTH);
+		memcpy(cur_line, lines[i].scan, VFS301_FP_OUTPUT_WIDTH);
 #else
-		memcpy(cur_line, &lines[i], FP_OUTPUT_WIDTH);
+		memcpy(cur_line, &lines[i], VFS301_FP_OUTPUT_WIDTH);
 #endif
 	}
 	
@@ -338,20 +338,20 @@ static unsigned char usb_send_buf[0x2000];
 
 #define RAW_DATA(x) x, sizeof(x)
 
-#define IS_FP_SEQ_START(b) ((b[0] == 0x01) && (b[1] == 0xfe))
+#define IS_VFS301_FP_SEQ_START(b) ((b[0] == 0x01) && (b[1] == 0xfe))
 
-static int proto_process_data(int first_block, vfs_dev_t *dev)
+static int proto_process_data(int first_block, vfs301_dev_t *dev)
 {
 	int i;
 	const unsigned char *buf = dev->recv_buf;
 	int len = dev->recv_len;
 	
 	if (first_block) {
-		assert(len >= FP_FRAME_SIZE);
+		assert(len >= VFS301_FP_FRAME_SIZE);
 		
 		// Skip bytes until start_sequence is found
-		for (i = 0; i < FP_FRAME_SIZE; i++, buf++, len--) {
-			if (IS_FP_SEQ_START(buf))
+		for (i = 0; i < VFS301_FP_FRAME_SIZE; i++, buf++, len--) {
+			if (IS_VFS301_FP_SEQ_START(buf))
 				break;
 		}
 	}
@@ -359,13 +359,13 @@ static int proto_process_data(int first_block, vfs_dev_t *dev)
 	return img_process_data(first_block, dev, buf, len);
 }
 
-static void proto_wait_for_event(vfs_dev_t *dev)
+static void proto_wait_for_event(vfs301_dev_t *dev)
 {
 	const char no_event[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	const char got_event[] = {0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00};
 	
 	USB_SEND(0x0220, 0xFA00);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //000000000000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //000000000000
 	
 #ifdef DEBUG
 	fprintf(stderr, "Entering proto_wait_for_event() loop...\n");
@@ -373,7 +373,7 @@ static void proto_wait_for_event(vfs_dev_t *dev)
 	
 	while (1) {
 		USB_SEND(0x17, -1);
-		assert(usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 7) == 0);
+		assert(usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 7) == 0);
 		
 		if (memcmp(dev->recv_buf, no_event, sizeof(no_event)) == 0) {
 			usleep(200000);
@@ -393,7 +393,7 @@ static void proto_wait_for_event(vfs_dev_t *dev)
 			a; \
 	}
 
-static void proto_process_event(vfs_dev_t *dev)
+static void proto_process_event(vfs301_dev_t *dev)
 {
 	int first_block = 1;
 	int rv;
@@ -420,13 +420,13 @@ static void proto_process_event(vfs_dev_t *dev)
 	 *    o FA00
 	 *    o 2C01
 	 */
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 64);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 64);
 	/* now read the fingerprint data, while there are some */
 	while (1) {
 		to_recv = first_block ? 84032 : 84096;
 		
 		rv = usb_recv(
-			dev, VALIDITY_RECEIVE_ENDPOINT_DATA, to_recv
+			dev, VFS301_RECEIVE_ENDPOINT_DATA, to_recv
 		);
 		
 		if (rv == LIBUSB_ERROR_TIMEOUT)
@@ -451,101 +451,101 @@ static void proto_process_event(vfs_dev_t *dev)
 	/* the following may come in random order, data may not come at all, don't
 	 * try for too long... */
 	VARIABLE_ORDER(
-		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2), //1204
-		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 16384)
+		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2), //1204
+		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 16384)
 	);
 	
 	USB_SEND(0x0220, 2);
 	VARIABLE_ORDER(
-		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760), //seems to come always
-		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2) //0000
+		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 5760), //seems to come always
+		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2) //0000
 	);
 }
 
-void proto_init(vfs_dev_t *dev)
+void proto_init(vfs301_dev_t *dev)
 {
 	USB_SEND(0x01, -1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 38);
 	USB_SEND(0x0B, 0x04);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 6); //000000000000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 6); //000000000000
 	USB_SEND(0x0B, 0x05);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 7); //00000000000000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 7); //00000000000000
 	USB_SEND(0x19, -1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 64);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 4); //6BB4D0BC
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 64);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 4); //6BB4D0BC
 	usb_send(dev, RAW_DATA(vfs301_06_1));
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x01, -1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 38);
 	USB_SEND(0x1A, -1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, RAW_DATA(vfs301_06_2));
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	USB_SEND(0x0220, 1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 256);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 32);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 256);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 32);
 	
 	USB_SEND(0x1A, -1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, RAW_DATA(vfs301_06_3));
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x01, -1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 38);
 	USB_SEND(0x02D0, 1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 11648);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 11648);
 	USB_SEND(0x02D0, 2);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 53248);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 53248);
 	USB_SEND(0x02D0, 3);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 19968);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 19968);
 	USB_SEND(0x02D0, 4);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5824);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 5824);
 	USB_SEND(0x02D0, 5);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 6656);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 6656);
 	USB_SEND(0x02D0, 6);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 6656);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 6656);
 	USB_SEND(0x02D0, 7);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 832);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 832);
 	usb_send(dev, RAW_DATA(vfs301_12));
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x1A, -1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, RAW_DATA(vfs301_06_2));
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	USB_SEND(0x0220, 2);
 	VARIABLE_ORDER(
-		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2), //0000
-		usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760)
+		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2), //0000
+		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 5760)
 	);
 	
 	USB_SEND(0x1A, -1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, RAW_DATA(vfs301_06_1));
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x1A, -1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, RAW_DATA(vfs301_06_4));
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	usb_send(dev, RAW_DATA(vfs301_24)); /* turns on white */
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x01, -1);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 38);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 38);
 	USB_SEND(0x0220, 3);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 2368);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_CTRL, 36);
-	usb_recv(dev, VALIDITY_RECEIVE_ENDPOINT_DATA, 5760);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2368);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 36);
+	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 5760);
 	
 	while (1) {
 		fprintf(stderr, "waiting for next fingerprint...\n");
@@ -555,6 +555,6 @@ void proto_init(vfs_dev_t *dev)
 	}
 }
 
-void proto_deinit(vfs_dev_t *dev)
+void proto_deinit(vfs301_dev_t *dev)
 {
 }

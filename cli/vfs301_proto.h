@@ -19,11 +19,11 @@
  */
 
 enum {
-	VALIDITY_DEFAULT_WAIT_TIMEOUT = 300,
+	VFS301_DEFAULT_WAIT_TIMEOUT = 300,
 	
-	VALIDITY_SEND_ENDPOINT = 0x01,
-	VALIDITY_RECEIVE_ENDPOINT_CTRL = 0x81,
-	VALIDITY_RECEIVE_ENDPOINT_DATA = 0x82
+	VFS301_SEND_ENDPOINT = 0x01,
+	VFS301_RECEIVE_ENDPOINT_CTRL = 0x81,
+	VFS301_RECEIVE_ENDPOINT_DATA = 0x82
 };
 
 typedef struct {
@@ -56,31 +56,34 @@ typedef struct {
 	/* buffer to hold raw scanlines */
 	unsigned char *scanline_buf;
 	int scanline_count;
-} vfs_dev_t;
+} vfs301_dev_t;
 
 
 enum {
 	/* Width of the scanned data in px */
-	FP_WIDTH = 200,
+	VFS301_FP_WIDTH = 200,
 	
 	/* sizeof(fp_line_t) */
-	FP_FRAME_SIZE = 288,
+	VFS301_FP_FRAME_SIZE = 288,
 	/* Width of output line */
 #ifndef OUTPUT_RAW
-	FP_OUTPUT_WIDTH = FP_WIDTH,
+	VFS301_FP_OUTPUT_WIDTH = VFS301_FP_WIDTH,
 #else
-	FP_OUTPUT_WIDTH = FP_FRAME_SIZE,
+	VFS301_FP_OUTPUT_WIDTH = VFS301_FP_FRAME_SIZE,
 #endif
 
-	FP_SUM_LINES = 3,
+	VFS301_FP_SUM_LINES = 3,
+	
+#ifdef SCAN_FINISH_DETECTION
 	/* TODO: The following changes (seen ~60 and ~80) In that 
 	 * case we'll need to calibrate this from empty data somehow... */
-	FP_SUM_MEDIAN = 60,
-	FP_SUM_EMPTY_RANGE = 5,
-	
+	VFS301_FP_SUM_MEDIAN = 60,
+	VFS301_FP_SUM_EMPTY_RANGE = 5,
+#endif
+
 	/* Minimum average difference between returned lines */
-	FP_LINE_DIFF_THRESHOLD = 15,
-} fp_line_flag_data;
+	VFS301_FP_LINE_DIFF_THRESHOLD = 15,
+};
 
 typedef struct {
 	unsigned char sync_0x01;
@@ -94,7 +97,7 @@ typedef struct {
 	unsigned char flag_1;
 	unsigned char sync_0x00;
 	
-	unsigned char scan[FP_WIDTH];
+	unsigned char scan[VFS301_FP_WIDTH];
 	
 	/* A offseted, stretched, inverted copy of scan... probably could
 	 * serve finger motion speed detection?
@@ -105,10 +108,10 @@ typedef struct {
 	unsigned char sum1[2];
 	unsigned char sum2[11];
 	unsigned char sum3[3];
-} fp_line_t;
+} vfs301_line_t;
 
-int usb_recv(vfs_dev_t *dev, unsigned char endpoint, int max_bytes);
-int usb_send(vfs_dev_t *dev, const unsigned char *data, int length);
+int usb_recv(vfs301_dev_t *dev, unsigned char endpoint, int max_bytes);
+int usb_send(vfs301_dev_t *dev, const unsigned char *data, int length);
 
-void proto_init(vfs_dev_t *dev);
-void proto_deinit(vfs_dev_t *dev);
+void proto_init(vfs301_dev_t *dev);
+void proto_deinit(vfs301_dev_t *dev);
