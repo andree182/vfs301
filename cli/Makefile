@@ -13,7 +13,7 @@ access:
 	fi
 
 cli: vfs301_proto.c cli.c
-	gcc $(CFLAGS) -ggdb `pkg-config --cflags libusb-1.0` `pkg-config --libs libusb-1.0` -o $@ $^
+	gcc $(CFLAGS) -ggdb `pkg-config --cflags libusb-1.0` -o $@ $^ `pkg-config --libs libusb-1.0`
 
 clean: 
 	rm cli
