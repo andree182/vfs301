@@ -17,6 +17,7 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
+#include <libusb-1.0/libusb.h>
 
 enum {
 	VFS301_DEFAULT_WAIT_TIMEOUT = 300,
@@ -27,37 +28,14 @@ enum {
 };
 
 typedef struct {
-	/* context object for libusb library */
-	struct libusb_context *ctx;
-
-	/* libusb device handle for fingerprint reader */
-	struct libusb_device_handle *devh;
-
-	/* init state of the usb subsystem */
-	enum {
-		STATE_NOTHING,
-		STATE_INIT,
-		STATE_OPEN,
-		STATE_CLAIMED,
-		STATE_CONFIGURED
-	} state;
-
 	/* buffer for received data */
 	unsigned char recv_buf[0x20000];
 	int recv_len;
-	
-	/* sequence number for current send/recv transaction pair */
-	unsigned short seq;
-
-	/* The last response from the device, valid immediately after a recv() */
-	unsigned char buf[0x40];
-	int len;
 
 	/* buffer to hold raw scanlines */
 	unsigned char *scanline_buf;
 	int scanline_count;
 } vfs301_dev_t;
-
 
 enum {
 	/* Width of the scanned data in px */
@@ -110,8 +88,5 @@ typedef struct {
 	unsigned char sum3[3];
 } vfs301_line_t;
 
-int usb_recv(vfs301_dev_t *dev, unsigned char endpoint, int max_bytes);
-int usb_send(vfs301_dev_t *dev, const unsigned char *data, int length);
-
-void proto_init(vfs301_dev_t *dev);
-void proto_deinit(vfs301_dev_t *dev);
+void proto_init(struct libusb_device_handle *devh, vfs301_dev_t *dev);
+void proto_deinit(struct libusb_device_handle *devh, vfs301_dev_t *dev);

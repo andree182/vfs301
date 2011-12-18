@@ -32,6 +32,74 @@
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 
+/************************** USB STUFF *****************************************/
+
+static void usb_print_packet(int dir, int rv, const unsigned char *data, int length) 
+{
+	int i;
+
+#ifdef DEBUG
+	fprintf(stderr, "%s, rv %d, len %d\n", dir ? "send" : "recv", rv, length);
+#endif
+	
+#ifdef PRINT_VERBOSE
+	for (i = 0; i < min(length, 128); i++) {
+		fprintf(stderr, "%.2X ", data[i]);
+		if (i % 8 == 7)
+			fprintf(stderr, " ");
+		if (i % 32 == 31)
+			fprintf(stderr, "\n");
+	}
+#endif
+
+	fprintf(stderr, "\n");
+}
+
+static int usb_recv(
+	vfs301_dev_t *dev,
+	struct libusb_device_handle *devh, unsigned char endpoint, int max_bytes)
+{
+	assert(max_bytes <= sizeof(dev->recv_buf));
+	
+	int r = libusb_bulk_transfer(
+		devh, endpoint, 
+		dev->recv_buf, max_bytes,
+		&dev->recv_len, VFS301_DEFAULT_WAIT_TIMEOUT
+	);
+	
+#ifdef DEBUG
+	usb_print_packet(0, r, dev->recv_buf, dev->recv_len);
+#endif
+	
+	if (r < 0)
+		return r;
+	return 0;
+}
+
+static int usb_send(
+	struct libusb_device_handle *devh, const unsigned char *data, int length)
+{
+	int transferred = 0;
+	
+	int r = libusb_bulk_transfer(
+		devh, VFS301_SEND_ENDPOINT, 
+		(unsigned char *)data, length, &transferred, VFS301_DEFAULT_WAIT_TIMEOUT
+	);
+
+#ifdef DEBUG
+	usb_print_packet(1, r, data, length);
+#endif
+	
+	assert(r == 0);
+	
+	if (r < 0)
+		return r;
+	if (transferred < length)
+		return r;
+	
+	return 0;
+}
+
 /************************** OUT MESSAGES GENERATION ***************************/
 
 static void proto_generate_0B(int subtype, unsigned char *data, int *len)
@@ -329,11 +397,14 @@ static int img_process_data(
 
 static unsigned char usb_send_buf[0x2000];
 
+#define USB_RECV(from, len) \
+	usb_recv(dev, devh, from, len)
+	
 #define USB_SEND(type, subtype) \
 	{ \
 		int len; \
 		proto_generate(type, subtype, usb_send_buf, &len); \
-		usb_send(dev, usb_send_buf, len); \
+		usb_send(devh, usb_send_buf, len); \
 	}
 
 #define RAW_DATA(x) x, sizeof(x)
@@ -359,13 +430,14 @@ static int proto_process_data(int first_block, vfs301_dev_t *dev)
 	return img_process_data(first_block, dev, buf, len);
 }
 
-static void proto_wait_for_event(vfs301_dev_t *dev)
+static void proto_wait_for_event(
+	struct libusb_device_handle *devh, vfs301_dev_t *dev)
 {
 	const char no_event[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	const char got_event[] = {0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00};
 	
 	USB_SEND(0x0220, 0xFA00);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //000000000000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //000000000000
 	
 #ifdef DEBUG
 	fprintf(stderr, "Entering proto_wait_for_event() loop...\n");
@@ -373,7 +445,7 @@ static void proto_wait_for_event(vfs301_dev_t *dev)
 	
 	while (1) {
 		USB_SEND(0x17, -1);
-		assert(usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 7) == 0);
+		assert(USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 7) == 0);
 		
 		if (memcmp(dev->recv_buf, no_event, sizeof(no_event)) == 0) {
 			usleep(200000);
@@ -393,7 +465,8 @@ static void proto_wait_for_event(vfs301_dev_t *dev)
 			a; \
 	}
 
-static void proto_process_event(vfs301_dev_t *dev)
+static void proto_process_event(
+	struct libusb_device_handle *devh, vfs301_dev_t *dev)
 {
 	int first_block = 1;
 	int rv;
@@ -420,14 +493,12 @@ static void proto_process_event(vfs301_dev_t *dev)
 	 *    o FA00
 	 *    o 2C01
 	 */
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 64);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 64);
 	/* now read the fingerprint data, while there are some */
 	while (1) {
 		to_recv = first_block ? 84032 : 84096;
 		
-		rv = usb_recv(
-			dev, VFS301_RECEIVE_ENDPOINT_DATA, to_recv
-		);
+		rv = USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, to_recv);
 		
 		if (rv == LIBUSB_ERROR_TIMEOUT)
 			break;
@@ -451,110 +522,110 @@ static void proto_process_event(vfs301_dev_t *dev)
 	/* the following may come in random order, data may not come at all, don't
 	 * try for too long... */
 	VARIABLE_ORDER(
-		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2), //1204
-		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 16384)
+		USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2), //1204
+		USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 16384)
 	);
 	
 	USB_SEND(0x0220, 2);
 	VARIABLE_ORDER(
-		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 5760), //seems to come always
-		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2) //0000
+		USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 5760), //seems to come always
+		USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2) //0000
 	);
 }
 
-void proto_init(vfs301_dev_t *dev)
+void proto_init(struct libusb_device_handle *devh, vfs301_dev_t *dev)
 {
 	USB_SEND(0x01, -1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 38);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 38);
 	USB_SEND(0x0B, 0x04);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 6); //000000000000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 6); //000000000000
 	USB_SEND(0x0B, 0x05);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 7); //00000000000000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 7); //00000000000000
 	USB_SEND(0x19, -1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 64);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 4); //6BB4D0BC
-	usb_send(dev, RAW_DATA(vfs301_06_1));
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 64);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 4); //6BB4D0BC
+	usb_send(devh, RAW_DATA(vfs301_06_1));
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x01, -1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 38);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 38);
 	USB_SEND(0x1A, -1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, RAW_DATA(vfs301_06_2));
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_send(devh, RAW_DATA(vfs301_06_2));
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	USB_SEND(0x0220, 1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 256);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 32);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 256);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 32);
 	
 	USB_SEND(0x1A, -1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, RAW_DATA(vfs301_06_3));
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_send(devh, RAW_DATA(vfs301_06_3));
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x01, -1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 38);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 38);
 	USB_SEND(0x02D0, 1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 11648);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 11648);
 	USB_SEND(0x02D0, 2);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 53248);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 53248);
 	USB_SEND(0x02D0, 3);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 19968);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 19968);
 	USB_SEND(0x02D0, 4);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 5824);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 5824);
 	USB_SEND(0x02D0, 5);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 6656);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 6656);
 	USB_SEND(0x02D0, 6);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 6656);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 6656);
 	USB_SEND(0x02D0, 7);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 832);
-	usb_send(dev, RAW_DATA(vfs301_12));
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 832);
+	usb_send(devh, RAW_DATA(vfs301_12));
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x1A, -1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, RAW_DATA(vfs301_06_2));
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_send(devh, RAW_DATA(vfs301_06_2));
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	USB_SEND(0x0220, 2);
 	VARIABLE_ORDER(
-		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2), //0000
-		usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 5760)
+		USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2), //0000
+		USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 5760)
 	);
 	
 	USB_SEND(0x1A, -1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, RAW_DATA(vfs301_06_1));
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_send(devh, RAW_DATA(vfs301_06_1));
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x1A, -1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, RAW_DATA(vfs301_06_4));
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
-	usb_send(dev, RAW_DATA(vfs301_24)); /* turns on white */
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_send(devh, RAW_DATA(vfs301_06_4));
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
+	usb_send(devh, RAW_DATA(vfs301_24)); /* turns on white */
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //0000
 	
 	USB_SEND(0x01, -1);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 38);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 38);
 	USB_SEND(0x0220, 3);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 2368);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_CTRL, 36);
-	usb_recv(dev, VFS301_RECEIVE_ENDPOINT_DATA, 5760);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2368);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 36);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 5760);
 	
 	while (1) {
 		fprintf(stderr, "waiting for next fingerprint...\n");
-		proto_wait_for_event(dev);
+		proto_wait_for_event(devh, dev);
 		fprintf(stderr, "reading fingerprint...\n");
-		proto_process_event(dev);
+		proto_process_event(devh, dev);
 	}
 }
 
-void proto_deinit(vfs301_dev_t *dev)
+void proto_deinit(struct libusb_device_handle *devh, vfs301_dev_t *dev)
 {
 }
