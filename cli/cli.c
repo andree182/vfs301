@@ -142,20 +142,7 @@ static void usb_deinit(void)
 	}
 }
 
-/************************** GENERIC STUFF *************************************/
-
-static vfs301_dev_t dev;
-
-static void init(vfs301_dev_t *dev)
-{
-	state = STATE_NOTHING;
-	dev->scanline_buf = malloc(0);
-	dev->scanline_count = 0;
-	
-	usb_init();
-	if (state == STATE_CONFIGURED)
-		vfs301_proto_init(devh, dev);
-}
+/******************************* OUTPUT ***************************************/
 
 static void img_store(vfs301_dev_t *dev)
 {
@@ -186,12 +173,29 @@ static void img_store(vfs301_dev_t *dev)
 	free(img);
 }
 
+/************************** GENERIC STUFF *************************************/
+
+static vfs301_dev_t dev;
+
+static void init(vfs301_dev_t *dev)
+{
+	state = STATE_NOTHING;
+	dev->scanline_buf = malloc(0);
+	dev->scanline_count = 0;
+	
+	usb_init();
+	if (state == STATE_CONFIGURED)
+		vfs301_proto_init(devh, dev);
+}
+
 static void work(vfs301_dev_t *dev)
 {
-	
 	while (1) {
 		fprintf(stderr, "waiting for next fingerprint...\n");
-		vfs301_proto_wait_for_event(devh, dev);
+		vfs301_proto_request_fingerprint(devh, dev);
+		while (!vfs301_proto_peek_event(devh, dev))
+			usleep(200000);
+		
 		fprintf(stderr, "reading fingerprint...\n");
 		vfs301_proto_process_event(devh, dev);
 		

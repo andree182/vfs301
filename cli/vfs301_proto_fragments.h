@@ -21,6 +21,10 @@
 /* There are many similar blocks in the data below, also the data are
  * self-similar (looks like some config blocks? pokes like in vfs101?) */
 
+/* Don't take the grouping below for granted - it's quite possible 
+ * I missed some block start, or split data that should be together.
+ * It's quite challenging, this reverse engineering... :-) */
+
 #define __01   0x88 /* sometimes also 0x87? depending on what? */
 
 static const char vfs301_06_1[] = { /* 2401 B */

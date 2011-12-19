@@ -91,7 +91,11 @@ typedef struct {
 void vfs301_proto_init(struct libusb_device_handle *devh, vfs301_dev_t *dev);
 void vfs301_proto_deinit(struct libusb_device_handle *devh, vfs301_dev_t *dev);
 
-void vfs301_proto_wait_for_event(
+void vfs301_proto_request_fingerprint(
+	struct libusb_device_handle *devh, vfs301_dev_t *dev);
+
+/** returns 0 if no event is ready, or 1 if there is one... */
+int vfs301_proto_peek_event(
 	struct libusb_device_handle *devh, vfs301_dev_t *dev);
 void vfs301_proto_process_event(
 	struct libusb_device_handle *devh, vfs301_dev_t *dev);

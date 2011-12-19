@@ -400,30 +400,28 @@ static int vfs301_proto_process_data(int first_block, vfs301_dev_t *dev)
 	return img_process_data(first_block, dev, buf, len);
 }
 
-void vfs301_proto_wait_for_event(
+void vfs301_proto_request_fingerprint(
+	struct libusb_device_handle *devh, vfs301_dev_t *dev)
+{
+	USB_SEND(0x0220, 0xFA00);
+	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //000000000000
+}
+
+int vfs301_proto_peek_event(
 	struct libusb_device_handle *devh, vfs301_dev_t *dev)
 {
 	const char no_event[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	const char got_event[] = {0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00};
+
+	USB_SEND(0x17, -1);
+	assert(USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 7) == 0);
 	
-	USB_SEND(0x0220, 0xFA00);
-	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //000000000000
-	
-#ifdef DEBUG
-	fprintf(stderr, "Entering vfs301_proto_wait_for_event() loop...\n");
-#endif
-	
-	while (1) {
-		USB_SEND(0x17, -1);
-		assert(USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 7) == 0);
-		
-		if (memcmp(dev->recv_buf, no_event, sizeof(no_event)) == 0) {
-			usleep(200000);
-		} else if (memcmp(dev->recv_buf, got_event, sizeof(no_event)) == 0) {
-			break;
-		} else {
-			assert(!"unexpected reply to wait");
-		}
+	if (memcmp(dev->recv_buf, no_event, sizeof(no_event)) == 0) {
+		return 0;
+	} else if (memcmp(dev->recv_buf, got_event, sizeof(no_event)) == 0) {
+		return 1;
+	} else {
+		assert(!"unexpected reply to wait");
 	}
 }
 
