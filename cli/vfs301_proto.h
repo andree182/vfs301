@@ -88,5 +88,13 @@ typedef struct {
 	unsigned char sum3[3];
 } vfs301_line_t;
 
-void proto_init(struct libusb_device_handle *devh, vfs301_dev_t *dev);
-void proto_deinit(struct libusb_device_handle *devh, vfs301_dev_t *dev);
+void vfs301_proto_init(struct libusb_device_handle *devh, vfs301_dev_t *dev);
+void vfs301_proto_deinit(struct libusb_device_handle *devh, vfs301_dev_t *dev);
+
+void vfs301_proto_wait_for_event(
+	struct libusb_device_handle *devh, vfs301_dev_t *dev);
+void vfs301_proto_process_event(
+	struct libusb_device_handle *devh, vfs301_dev_t *dev);
+
+unsigned char *vfs301_extract_image(
+	vfs301_dev_t *vfs, int *output_height);

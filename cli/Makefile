@@ -3,7 +3,6 @@ CUR_DEV=/dev/bus/usb/`lsusb|grep '138a:000[58]' | cut -d' ' -f2,4 | sed 's/://' 
 
 # CFLAGS+="-DDEBUG"
 # CFLAGS+="-DOUTPUT_RAW"
-CFLAGS+="-DSTORE_SCANS"
 
 all: access cli
 

@@ -102,7 +102,7 @@ static int usb_send(
 
 /************************** OUT MESSAGES GENERATION ***************************/
 
-static void proto_generate_0B(int subtype, unsigned char *data, int *len)
+static void vfs301_proto_generate_0B(int subtype, unsigned char *data, int *len)
 {
 	*data = 0x0B;
 	*len = 1;
@@ -153,7 +153,7 @@ static void translate_str(const char **srcL, unsigned char *data, int *len)
 	*len = data - dataOrig;
 }
 
-static void proto_generate(int type, int subtype, unsigned char *data, int *len)
+static void vfs301_proto_generate(int type, int subtype, unsigned char *data, int *len)
 {
 	switch (type) {
 	case 0x01:
@@ -172,7 +172,7 @@ static void proto_generate(int type, int subtype, unsigned char *data, int *len)
 		*len = 1;
 		break;
 	case 0x0B:
-		proto_generate_0B(subtype, data, len);
+		vfs301_proto_generate_0B(subtype, data, len);
 		break;
 	case 0x02D0:
 		{
@@ -230,7 +230,7 @@ static void proto_generate(int type, int subtype, unsigned char *data, int *len)
 	}
 }
 
-/************************** SCAN IMAGE STUFF **********************************/
+/************************** SCAN IMAGE PROCESSING *****************************/
 
 #ifdef SCAN_FINISH_DETECTION
 static int img_is_finished_scan(fp_line_t *lines, int no_lines)
@@ -251,7 +251,6 @@ static int img_is_finished_scan(fp_line_t *lines, int no_lines)
 }
 #endif
 
-#ifdef STORE_SCANS
 static int scanline_diff(const unsigned char *scanlines, int prev, int cur)
 {
 	const unsigned char *line1 = 
@@ -263,8 +262,8 @@ static int scanline_diff(const unsigned char *scanlines, int prev, int cur)
 	
 #ifdef OUTPUT_RAW
 	/* We only need the image, not the surrounding stuff. */
-	line1 = ((fp_line_t*)line1)->scan;
-	line2 = ((fp_line_t*)line2)->scan;
+	line1 = ((vfs301_line_t*)line1)->scan;
+	line2 = ((vfs301_line_t*)line2)->scan;
 #endif
 	
 	for (diff = 0, i = 0; i < VFS301_FP_WIDTH; i++) {
@@ -281,16 +280,16 @@ static int scanline_diff(const unsigned char *scanlines, int prev, int cur)
 }
 
 /** Transform the input data to a normalized fingerprint scan */
-static unsigned char *
-	scanlines_to_img(const unsigned char *scanlines, int lines, 
-	int *output_height
+unsigned char *
+	vfs301_extract_image(vfs301_dev_t *vfs, int *output_height
 )
 {
+	const unsigned char *scanlines = vfs->scanline_buf;
 	int last_line;
 	int i;
 	unsigned char *output;
 	
-	assert(lines >= 1);
+	assert(vfs->scanline_count >= 1);
 	
 	output = malloc(VFS301_FP_OUTPUT_WIDTH);
 	*output_height = 1;
@@ -303,7 +302,7 @@ static unsigned char *
 	 * of bi/tri-linear resampling to get the output (so that we don't get so
 	 * many false edges etc.).
 	 */
-	for (i = 1; i < lines; i++) {
+	for (i = 1; i < vfs->scanline_count; i++) {
 		if (scanline_diff(scanlines, last_line, i)) {
 			output = realloc(output, VFS301_FP_OUTPUT_WIDTH * (*output_height + 1));
 			memcpy(
@@ -318,29 +317,6 @@ static unsigned char *
 	
 	return output;
 }
-
-static void img_store(vfs301_dev_t *dev)
-{
-	static int idx = 0;
-	char fn[32];
-	FILE *f;
-	unsigned char *img;
-	int height;
-	
-	img = scanlines_to_img(dev->scanline_buf, dev->scanline_count, &height);
-	
-	sprintf(fn, "scan_%02d.pgm", idx++);
-	
-	f = fopen(fn, "wb");
-	assert(f != NULL);
-	
-	fprintf(f, "P5\n%d %d\n255\n", VFS301_FP_OUTPUT_WIDTH, height);
-	fwrite(img, height * VFS301_FP_OUTPUT_WIDTH, 1, f);
-	fclose(f);
-	
-	free(img);
-}
-#endif
 
 static int img_process_data(
 	int first_block, vfs301_dev_t *dev, const unsigned char *buf, int len
@@ -380,12 +356,6 @@ static int img_process_data(
 	
 #ifdef SCAN_FINISH_DETECTION
 	finished_scan = img_is_finished_scan(lines, no_lines);
-	
-#ifdef STORE_SCANS
-	if (finished_scan) {
-		img_store(dev);
-	}
-#endif
 
 	return !finished_scan;
 #else /* SCAN_FINISH_DETECTION */
@@ -403,7 +373,7 @@ static unsigned char usb_send_buf[0x2000];
 #define USB_SEND(type, subtype) \
 	{ \
 		int len; \
-		proto_generate(type, subtype, usb_send_buf, &len); \
+		vfs301_proto_generate(type, subtype, usb_send_buf, &len); \
 		usb_send(devh, usb_send_buf, len); \
 	}
 
@@ -411,7 +381,7 @@ static unsigned char usb_send_buf[0x2000];
 
 #define IS_VFS301_FP_SEQ_START(b) ((b[0] == 0x01) && (b[1] == 0xfe))
 
-static int proto_process_data(int first_block, vfs301_dev_t *dev)
+static int vfs301_proto_process_data(int first_block, vfs301_dev_t *dev)
 {
 	int i;
 	const unsigned char *buf = dev->recv_buf;
@@ -430,7 +400,7 @@ static int proto_process_data(int first_block, vfs301_dev_t *dev)
 	return img_process_data(first_block, dev, buf, len);
 }
 
-static void proto_wait_for_event(
+void vfs301_proto_wait_for_event(
 	struct libusb_device_handle *devh, vfs301_dev_t *dev)
 {
 	const char no_event[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -440,7 +410,7 @@ static void proto_wait_for_event(
 	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2); //000000000000
 	
 #ifdef DEBUG
-	fprintf(stderr, "Entering proto_wait_for_event() loop...\n");
+	fprintf(stderr, "Entering vfs301_proto_wait_for_event() loop...\n");
 #endif
 	
 	while (1) {
@@ -465,7 +435,7 @@ static void proto_wait_for_event(
 			a; \
 	}
 
-static void proto_process_event(
+void vfs301_proto_process_event(
 	struct libusb_device_handle *devh, vfs301_dev_t *dev)
 {
 	int first_block = 1;
@@ -506,17 +476,11 @@ static void proto_process_event(
 		if (dev->recv_len < to_recv)
 			break;
 		
-		if (!proto_process_data(first_block, dev))
+		if (!vfs301_proto_process_data(first_block, dev))
 			break;
 		
 		first_block = 0;
 	}
-	
-#ifndef SCAN_FINISH_DETECTION
-#ifdef STORE_SCANS
-	img_store(dev);
-#endif
-#endif
 
 	USB_SEND(0x04, -1);
 	/* the following may come in random order, data may not come at all, don't
@@ -533,7 +497,7 @@ static void proto_process_event(
 	);
 }
 
-void proto_init(struct libusb_device_handle *devh, vfs301_dev_t *dev)
+void vfs301_proto_init(struct libusb_device_handle *devh, vfs301_dev_t *dev)
 {
 	USB_SEND(0x01, -1);
 	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 38);
@@ -617,15 +581,8 @@ void proto_init(struct libusb_device_handle *devh, vfs301_dev_t *dev)
 	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2368);
 	USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 36);
 	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 5760);
-	
-	while (1) {
-		fprintf(stderr, "waiting for next fingerprint...\n");
-		proto_wait_for_event(devh, dev);
-		fprintf(stderr, "reading fingerprint...\n");
-		proto_process_event(devh, dev);
-	}
 }
 
-void proto_deinit(struct libusb_device_handle *devh, vfs301_dev_t *dev)
+void vfs301_proto_deinit(struct libusb_device_handle *devh, vfs301_dev_t *dev)
 {
 }

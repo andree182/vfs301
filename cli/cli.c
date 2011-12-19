@@ -153,16 +153,55 @@ static void init(vfs301_dev_t *dev)
 	dev->scanline_count = 0;
 	
 	usb_init();
-	proto_init(devh, dev);
+	if (state == STATE_CONFIGURED)
+		vfs301_proto_init(devh, dev);
+}
+
+static void img_store(vfs301_dev_t *dev)
+{
+	static int idx = 0;
+	char fn[32];
+	FILE *f;
+	unsigned char *img;
+	int height;
+	
+	img = vfs301_extract_image(dev, &height);
+	
+	if (height > 20) {
+		sprintf(fn, "scan_%02d.pgm", idx++);
+		
+		f = fopen(fn, "wb");
+		assert(f != NULL);
+		
+		fprintf(f, "P5\n%d %d\n255\n", VFS301_FP_OUTPUT_WIDTH, height);
+		fwrite(img, height * VFS301_FP_OUTPUT_WIDTH, 1, f);
+		fclose(f);
+	} else {
+		fprintf(stderr, 
+			"fingerprint too short (%dx%d px), ignoring...\n", 
+			VFS301_FP_WIDTH, height
+		);
+	}
+	
+	free(img);
 }
 
 static void work(vfs301_dev_t *dev)
 {
+	
+	while (1) {
+		fprintf(stderr, "waiting for next fingerprint...\n");
+		vfs301_proto_wait_for_event(devh, dev);
+		fprintf(stderr, "reading fingerprint...\n");
+		vfs301_proto_process_event(devh, dev);
+		
+		img_store(dev);
+	}
 }
 
 static void deinit(vfs301_dev_t *dev)
 {
-	proto_deinit(devh, dev);
+	vfs301_proto_deinit(devh, dev);
 	usb_deinit();
 	
 	free(dev->scanline_buf);
@@ -176,7 +215,7 @@ static void handle_signal(int sig)
 	deinit(&dev);
 }
 
-int main (int argc, char **argv)
+int main(int argc, char **argv)
 {
 	signal(SIGINT, handle_signal);
 	state = STATE_NOTHING;
