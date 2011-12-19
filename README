@@ -2,8 +2,7 @@ Introduction
 ================================================================================
 
 This is a work-in-progress driver for vfs301 usb device 138a:0005. Reportedly
-it also works for 138a:0008 (vfs300), and maybe also other compatible ones - 
-vfs451 perhaps?.
+it also works for 138a:0008 (vfs300), and maybe also other compatible ones...
 
 Distributable under GPLv2 or later.
 
@@ -18,10 +17,10 @@ space for improvement:
 * check which messages are really required
 * check how to blink the white/orange LEDs for wait/success/failure 
   notifications
-* check how to properly prepare the scaner to wait for new finger (instead of
+* check how to properly prepare the scanner to wait for new finger (instead of
   returning the noise half the time)
-* check how to detect which part of the scanned data is the fingeprint
-* the received data are highly distrorted depending on speed of finger - find
+* check how to detect which part of the scanned data is the fingerprint
+* the received data are highly distorted depending on speed of finger - find
   some way to normalize it (or will libfprint do it?)
 
 
@@ -57,7 +56,7 @@ Protocol
 Didn't really do any major findings about it, but so far it seems pretty simple,
 no encryption, sequence numbers or challenge-response cr..stuff whatsoever.
 
-You send some data in (you can send the same data each time, it seems), whic 
+You send some data in (you can send the same data each time, it seems), which 
 prepares the device, and then it sends data back (which you have to acknowledge
 etc. - but still it seems the same data over and over will do).
 
