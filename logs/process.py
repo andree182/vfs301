@@ -39,26 +39,33 @@ def parseCsv(path):
 def dumpCutCsv(path, lines):
 	w = csv.writer(open(path, 'w')).writerows(lines)
 
-def dumpPgm(path, lines):
+def dumpPpm(path, lines):
 	LINEWIDTH = 288
 	#LINEWIDTH = 208
 	
 	raw = ""
 	for l in lines:
-		#if l[3] == "in" and l[4] == "01:00:82":
-			raw += l[6]
-			
-			raw += "FFEFDFCFBFAF"
-			raw += "00" * (LINEWIDTH - (len(l[6])/2 % LINEWIDTH) - 6)
-			raw += "0055005500550055" + "00" * (LINEWIDTH - 8)
-			raw += "00" * LINEWIDTH
-			raw += "FF" * LINEWIDTH
+		if l[3] == "in" and l[4] == "01:00:81":
+			c = "0000FF"
+		elif l[3] == "in" and l[4] == "01:00:82":
+			c = "00FF00"
+		else:
+			c = "FF0000"
+		
+		raw += c * LINEWIDTH
+		
+		for i in range(0, len(l[6]) / 2):
+			raw += l[6][(i * 2):(i * 2 + 2)] * 3
+		
+		raw += "FFFF00" # the end of data
+		
+		raw += "00" * (LINEWIDTH - (len(l[6])/2 % LINEWIDTH) - 1) * 3
 
 	rf = open(path, 'w')
 
 	height = len(raw) / 2 / LINEWIDTH
 
-	rf.write("P5\n%d %d\n255\n" % (LINEWIDTH, height))
+	rf.write("P6\n%d %d\n255\n" % (LINEWIDTH, height))
 	rf.write(binascii.unhexlify(raw))
 
 def dumpSrc(pathc, pathh, lines):
@@ -123,5 +130,5 @@ def dumpSrc(pathc, pathh, lines):
 lines = parseCsv(sys.argv[1] + ".csv")
 
 dumpCutCsv(sys.argv[1] + "-cut.csv", lines)
-dumpPgm(sys.argv[1] + ".pgm", lines)
+dumpPpm(sys.argv[1] + ".ppm", lines)
 dumpSrc(sys.argv[1] + ".c", sys.argv[1] + ".h", lines)
