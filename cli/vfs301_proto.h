@@ -63,6 +63,24 @@ enum {
 	VFS301_FP_LINE_DIFF_THRESHOLD = 15,
 };
 
+/* Arrays of this structure is returned during the initialization as a response 
+ * to the 0x02D0 messages.
+ * It seems to be always the same - what is it for? Some kind of confirmation?
+ */
+typedef struct {
+	unsigned char sync_0x01;
+	unsigned char sync_0xfe;
+	
+	unsigned char counter_lo;
+	unsigned char counter_hi; // ?
+	
+	unsigned char flags[3];
+	
+	unsigned char sync_0x00;
+	
+	unsigned char scan[VFS301_FP_WIDTH];
+} vfs301_init_line_t;
+
 typedef struct {
 	unsigned char sync_0x01;
 	unsigned char sync_0xfe;
