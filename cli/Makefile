@@ -11,8 +11,8 @@ access:
 		sudo chown $(CUR_USER) $(CUR_DEV); \
 	fi
 
-cli: vfs301_proto.c cli.c
-	gcc $(CFLAGS) -ggdb `pkg-config --cflags libusb-1.0` -o $@ $^ `pkg-config --libs libusb-1.0`
+cli: vfs301_proto.c cli.c vfs301_proto_fragments.h vfs301_proto.h
+	gcc $(CFLAGS) -ggdb `pkg-config --cflags libusb-1.0` -o $@ $(filter %.c %.s,$^) `pkg-config --libs libusb-1.0`
 
 clean: 
 	rm cli
