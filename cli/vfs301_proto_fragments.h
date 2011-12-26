@@ -1133,7 +1133,19 @@ static const char vfs301_24[] = { /* 119 B */
 #define TERM() \
 	PACKET("1500", "0800", "0000000020280000")
 
-
+/* NOTE: 
+ * * Reordering the S1() macros in BLOB1 (and similar) doesn't
+ *   seem to make any change. 
+ * * Reordering lines inside the PACKET() does modify the output's columns
+ *   contents.
+ * 
+ * The contents of PACKET() inside this blob seems to be some kind
+ * of a micro-program, which specifies which columns contain what. LE seems
+ * to be used also here. Not neccessarily is 1 output column described
+ * by 1 operation. For example the vfs301_line_t::sum section seems
+ * to perform 2 operations for each column - probably some kind of diff between
+ * input lines?
+ */
 #define vfs301_0220_BLOB1 \
 	S1("0420", "0430", "00000000"),\
 	S1("1820", "0430", "00000000"),\
@@ -1204,6 +1216,8 @@ static const char vfs301_24[] = { /* 119 B */
 	"1AF88700" \
 	"1AF88700" \
 	"1AF88700" \
+	/* NOTE: The following(?) 200 values specify order of fingerprint columns \
+	/* in vfs301_line_t::scan. */ \
 	"1AF80720" \
 	"1BF80720" \
 	"1CF80720" \
@@ -1404,12 +1418,17 @@ static const char vfs301_24[] = { /* 119 B */
 	"DFF80720" \
 	"E0F80720" \
 	"E1F80720" \
+	\
 	"E1F80700" \
 	"0BF88700" \
 	"0BF88700" \
 	"0BF88700" \
 	"0BF88700" \
 	"0BF88700" \
+	/* NOTE: The following(?) 64 values specify order of fingerprint columns \
+	/* in vfs301_line_t::mirror. \
+	/* Placing Z8() instead of the value shortens the mirror section. \
+	/* */ \
 	"0BF88700" \
 	"0AF80720" \
 	"09F80720" \
@@ -1474,8 +1493,10 @@ static const char vfs301_24[] = { /* 119 B */
 	"E6F80720" \
 	"E5F80720" \
 	"E4F80720" \
+	\
 	"0BF80720" \
 	"0BF80700" \
+	\
 	"5CF2C700" \
 	"5CF2C700" \
 	"5CF2C700" \
@@ -1494,6 +1515,9 @@ static const char vfs301_24[] = { /* 119 B */
 	"5CF84700" \
 	"5CF84700" \
 	"5CF84700" \
+	\
+	/* NOTE: The following(?) values specify order of fingerprint columns \
+	/* in vfs301_line_t::sum*. */ \
 	"5CF84700" \
 	"5CF84720" \
 	"62F84700" \
@@ -1518,6 +1542,7 @@ static const char vfs301_24[] = { /* 119 B */
 	"9E844700" \
 	"9E844720" \
 	"9E844700" \
+	\
 	"FFF96700" "FFF96700" "FFF96700" "FFF96700" "FFF96720" \
 	"0DF86700" "0DF86700" "0DF86700" "0DF86700" "0DF86700" \
 	"0DF86720" "0DF86700" \
@@ -1717,6 +1742,9 @@ const char *vfs301_0220_01[] = {
 	S1("0C00", "0038", "01030200"),
 	S1("1000", "0038", "01070200"),
 	S1("1400", "0038", "0C0C8A00"),
+	
+	/* TODO: looks like that removing this whole packet doesn't cause
+	 * any troubles. */
 	PACKET("0200", "8005",
 		"FFF98720"
 		"83488420"
@@ -2226,6 +2254,9 @@ const char *vfs301_02D0_04[] = {
 	S1("A020", "0430", "EFE10000"),
 	S1("A420", "0430", "00000000"),
 	vfs301_02D0_BLOB1,
+	
+	/* TODO: looks like that removing this whole packet doesn't cause
+	 * any troubles. */
 	PACKET("0200", "8005",
 	"FFF30720" "80F20720" "FFF30720" "80F20720"
 	"FFF30720" "80F20720" "FFF30720" "80F20720"
@@ -2392,6 +2423,9 @@ const char *vfs301_02D0_05[] = {
 	S1("A020", "0430", "EFE10000"),
 	S1("A420", "0430", "00000000"),
 	vfs301_02D0_BLOB1,
+	
+	/* TODO: looks like that removing this whole packet doesn't cause
+	 * any troubles. */
 	PACKET("0200", "8005",
 	"FFF34720" "80F24720" "FFF34720" "80F24720"
 	"FFF34720" "80F24720" "FFF34720" "80F24720"
