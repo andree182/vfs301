@@ -27,8 +27,11 @@ space for improvement:
 How to use
 ================================================================================
 
-Currently only a command line utility is available - libfprint integration is 
-planned after major problems are dealt with and the code is cleaned up.
+Either a command line utility is available, or the libfprint-integration patches 
+can be used. For the latter, see the libfprint subdirectory.
+
+
+The cli demo can be used as follows:
 
 
 Requirements:
