@@ -152,7 +152,9 @@ static void img_store(vfs301_dev_t *dev)
 	unsigned char *img;
 	int height;
 	
-	img = vfs301_extract_image(dev, &height);
+	img = malloc(dev->scanline_count * VFS301_FP_OUTPUT_WIDTH);
+	
+	vfs301_extract_image(dev, img, &height);
 	
 	if (height > 20) {
 		sprintf(fn, "scan_%02d.pgm", idx++);

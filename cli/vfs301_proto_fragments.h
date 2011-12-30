@@ -1222,7 +1222,7 @@ static const char vfs301_24[] = { /* 119 B */
 		"1AF88700" \
 		"1AF88700" \
 		/* NOTE: The following(?) 200 values specify order of fingerprint columns \
-		/* in vfs301_line_t::scan. */ \
+		 * in vfs301_line_t::scan. */ \
 		"1AF80720" \
 		"1BF80720" \
 		"1CF80720" \
@@ -1431,9 +1431,9 @@ static const char vfs301_24[] = { /* 119 B */
 		"0BF88700" \
 		"0BF88700" \
 		/* NOTE: The following(?) 64 values specify order of fingerprint columns \
-		/* in vfs301_line_t::mirror. \
-		/* Placing Z8() instead of the value shortens the mirror section. \
-		/* */ \
+		 * in vfs301_line_t::mirror. \
+		 * Placing Z8() instead of the value shortens the mirror section. \
+		 * */ \
 		"0BF88700" \
 		"0AF80720" \
 		"09F80720" \
@@ -1522,7 +1522,7 @@ static const char vfs301_24[] = { /* 119 B */
 		"5CF84700" \
 		\
 		/* NOTE: The following(?) values specify order of fingerprint columns \
-		/* in vfs301_line_t::sum*. */ \
+		 * in vfs301_line_t::sum*. */ \
 		"5CF84700" \
 		"5CF84720" \
 		"62F84700" \

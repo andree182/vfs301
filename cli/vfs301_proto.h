@@ -118,5 +118,5 @@ int vfs301_proto_peek_event(
 void vfs301_proto_process_event(
 	struct libusb_device_handle *devh, vfs301_dev_t *dev);
 
-unsigned char *vfs301_extract_image(
-	vfs301_dev_t *vfs, int *output_height);
+void vfs301_extract_image(
+	vfs301_dev_t *vfs, unsigned char *output, int *output_height);

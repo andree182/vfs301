@@ -1,0 +1,111 @@
+diff --git a/configure.ac b/configure.ac
+index f5c26f9..d59af3c 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -23,7 +23,7 @@ AC_SUBST(lt_major)
+ AC_SUBST(lt_revision)
+ AC_SUBST(lt_age)
+ 
+-all_drivers="upeke2 upekts upektc upeksonly vcom5s uru4000 fdu2000 aes1610 aes2501 aes4000 vfs101"
++all_drivers="upeke2 upekts upektc upeksonly vcom5s uru4000 fdu2000 aes1610 aes2501 aes4000 vfs101 vfs301"
+ 
+ require_imaging='no'
+ require_aeslib='no'
+@@ -38,6 +38,7 @@ enable_aes1610='no'
+ enable_aes2501='no'
+ enable_aes4000='no'
+ enable_vfs101='no'
++enable_vfs301='no'
+ 
+ AC_ARG_WITH([drivers],[AS_HELP_STRING([--with-drivers],
+ 	[List of drivers to enable])],
+@@ -96,6 +97,10 @@ for driver in `echo ${drivers} | sed -e 's/,/ /g' -e 's/,$//g'`; do
+ 			AC_DEFINE([ENABLE_VFS101], [], [Build Validity VFS101 driver])
+ 			enable_vfs101="yes"
+ 		;;
++		vfs301)
++			AC_DEFINE([ENABLE_VFS301], [], [Build Validity VFS301/VFS300 driver])
++			enable_vfs301="yes"
++		;;
+ 	esac
+ done
+ 
+@@ -111,6 +116,7 @@ AM_CONDITIONAL([ENABLE_AES2501], [test "$enable_aes2501" = "yes"])
+ AM_CONDITIONAL([ENABLE_AES4000], [test "$enable_aes4000" = "yes"])
+ AM_CONDITIONAL([REQUIRE_AESLIB], [test "$require_aeslib" = "yes"])
+ AM_CONDITIONAL([ENABLE_VFS101], [test "$enable_vfs101" = "yes"])
++AM_CONDITIONAL([ENABLE_VFS301], [test "$enable_vfs301" = "yes"])
+ 
+ 
+ PKG_CHECK_MODULES(LIBUSB, [libusb-1.0 >= 0.9.1])
+@@ -277,6 +283,11 @@ if test x$enable_vfs101 != xno ; then
+ else
+ 	AC_MSG_NOTICE([   vfs101 driver disabled])
+ fi
++if test x$enable_vfs301 != xno ; then
++	AC_MSG_NOTICE([** vfs301 driver enabled])
++else
++	AC_MSG_NOTICE([   vfs301 driver disabled])
++fi
+ if test x$require_aeslib != xno ; then
+ 	AC_MSG_NOTICE([** aeslib helper functions enabled])
+ else
+diff --git a/libfprint/Makefile.am b/libfprint/Makefile.am
+index 95601bc..f4c345f 100644
+--- a/libfprint/Makefile.am
++++ b/libfprint/Makefile.am
+@@ -13,6 +13,7 @@ AES4000_SRC = drivers/aes4000.c
+ FDU2000_SRC = drivers/fdu2000.c
+ VCOM5S_SRC = drivers/vcom5s.c
+ VFS101_SRC = drivers/vfs101.c
++VFS301_SRC = drivers/vfs301.c drivers/vfs301_proto.c  drivers/vfs301_proto.h drivers/vfs301_proto_fragments.h
+ 
+ EXTRA_DIST = \
+ 	$(UPEKE2_SRC)		\
+@@ -26,6 +27,7 @@ EXTRA_DIST = \
+ 	$(FDU2000_SRC)		\
+ 	$(VCOM5S_SRC)		\
+ 	$(VFS101_SRC)		\
++	$(VFS301_SRC)		\
+ 	aeslib.c aeslib.h	\
+ 	imagemagick.c		\
+ 	gdkpixbuf.c
+@@ -128,6 +130,10 @@ if ENABLE_VFS101
+ DRIVER_SRC += $(VFS101_SRC)
+ endif
+ 
++if ENABLE_VFS301
++DRIVER_SRC += $(VFS301_SRC)
++endif
++
+ if REQUIRE_IMAGEMAGICK
+ OTHER_SRC += imagemagick.c
+ libfprint_la_CFLAGS += $(IMAGING_CFLAGS)
+diff --git a/libfprint/core.c b/libfprint/core.c
+index 401c491..a9cd8ef 100644
+--- a/libfprint/core.c
++++ b/libfprint/core.c
+@@ -371,6 +371,9 @@ static struct fp_img_driver * const img_drivers[] = {
+ #ifdef ENABLE_VFS101
+ 	&vfs101_driver,
+ #endif
++#ifdef ENABLE_VFS301
++	&vfs301_driver,
++#endif
+ /*#ifdef ENABLE_UPEKTC
+ 	&upektc_driver,
+ #endif
+diff --git a/libfprint/fp_internal.h b/libfprint/fp_internal.h
+index e6134d4..886ad52 100644
+--- a/libfprint/fp_internal.h
++++ b/libfprint/fp_internal.h
+@@ -268,6 +268,9 @@ extern struct fp_img_driver vcom5s_driver;
+ #ifdef ENABLE_VFS101
+ extern struct fp_img_driver vfs101_driver;
+ #endif
++#ifdef ENABLE_VFS301
++extern struct fp_img_driver vfs301_driver;
++#endif
+ 
+ extern libusb_context *fpi_usb_ctx;
+ extern GSList *opened_devices;

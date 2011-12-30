@@ -34,15 +34,14 @@
 
 /************************** USB STUFF *****************************************/
 
+#ifdef DEBUG
 static void usb_print_packet(int dir, int rv, const unsigned char *data, int length) 
 {
-	int i;
-
-#ifdef DEBUG
 	fprintf(stderr, "%s, rv %d, len %d\n", dir ? "send" : "recv", rv, length);
-#endif
 	
 #ifdef PRINT_VERBOSE
+	int i;
+
 	for (i = 0; i < min(length, 128); i++) {
 		fprintf(stderr, "%.2X ", data[i]);
 		if (i % 8 == 7)
@@ -54,6 +53,7 @@ static void usb_print_packet(int dir, int rv, const unsigned char *data, int len
 
 	fprintf(stderr, "\n");
 }
+#endif
 
 static int usb_recv(
 	vfs301_dev_t *dev,
@@ -266,6 +266,8 @@ static int scanline_diff(const unsigned char *scanlines, int prev, int cur)
 	line2 = ((vfs301_line_t*)line2)->scan;
 #endif
 	
+	/* TODO: This doesn't work too well when there are parallel lines in the 
+	 * fingerprint. */
 	for (diff = 0, i = 0; i < VFS301_FP_WIDTH; i++) {
 		if (*line1 > *line2)
 			diff += *line1 - *line2;
@@ -280,18 +282,16 @@ static int scanline_diff(const unsigned char *scanlines, int prev, int cur)
 }
 
 /** Transform the input data to a normalized fingerprint scan */
-unsigned char *
-	vfs301_extract_image(vfs301_dev_t *vfs, int *output_height
+void vfs301_extract_image(
+	vfs301_dev_t *vfs, unsigned char *output, int *output_height
 )
 {
 	const unsigned char *scanlines = vfs->scanline_buf;
 	int last_line;
 	int i;
-	unsigned char *output;
 	
 	assert(vfs->scanline_count >= 1);
 	
-	output = malloc(VFS301_FP_OUTPUT_WIDTH);
 	*output_height = 1;
 	memcpy(output, scanlines, VFS301_FP_OUTPUT_WIDTH);
 	last_line = 0;
@@ -304,7 +304,6 @@ unsigned char *
 	 */
 	for (i = 1; i < vfs->scanline_count; i++) {
 		if (scanline_diff(scanlines, last_line, i)) {
-			output = realloc(output, VFS301_FP_OUTPUT_WIDTH * (*output_height + 1));
 			memcpy(
 				output + VFS301_FP_OUTPUT_WIDTH * (*output_height),
 				scanlines + VFS301_FP_OUTPUT_WIDTH * i,
@@ -314,8 +313,6 @@ unsigned char *
 			(*output_height)++;
 		}
 	}
-	
-	return output;
 }
 
 static int img_process_data(
@@ -427,9 +424,9 @@ int vfs301_proto_peek_event(
 
 #define VARIABLE_ORDER(a, b) \
 	{ \
-		int rv = a;\
+		int _rv = a;\
 		b; \
-		if (rv == -7) \
+		if (_rv == -7) \
 			a; \
 	}
 

@@ -31,18 +31,12 @@
 
 #include <fp_internal.h>
 
-
 /************************** GENERIC STUFF *************************************/
 
 /* Callback of asynchronous sleep */
 static void async_sleep_cb(void *data)
 {
 	struct fpi_ssm *ssm = data;
-	struct fp_img_dev *dev = ssm->priv;
-	struct vfs301_dev_t *vdev = dev->priv;
-
-	/* Cleanup timeout */
-	vdev->timeout = NULL;
 
 	fpi_ssm_next_state(ssm);
 }
@@ -51,18 +45,52 @@ static void async_sleep_cb(void *data)
 static void async_sleep(unsigned int msec, struct fpi_ssm *ssm)
 {
 	struct fp_img_dev *dev = ssm->priv;
-	struct vfs301_dev_t *vdev = dev->priv;
-
+	struct fpi_timeout *timeout;
+	
 	/* Add timeout */
-	vdev->timeout = fpi_timeout_add(msec, async_sleep_cb, ssm);
+	timeout = fpi_timeout_add(msec, async_sleep_cb, ssm);
 
-	if (vdev->timeout == NULL)
-	{
+	if (timeout == NULL) {
 		/* Failed to add timeout */
 		fp_err("failed to add timeout");
 		fpi_imgdev_session_error(dev, -ETIME);
 		fpi_ssm_mark_aborted(ssm, -ETIME);
 	}
+}
+
+static int submit_image(struct fpi_ssm *ssm)
+{
+	struct fp_img_dev *dev = ssm->priv;
+	vfs301_dev_t *vdev = dev->priv;
+	int height;
+	struct fp_img *img;
+	
+#if 0
+	// This is probably handled by libfprint automagically?
+	if (vdev->scanline_count < 20) {
+		fpi_ssm_jump_to_state(ssm, M_REQUEST_PRINT);
+		return 0;
+	}
+#endif
+	
+	img = fpi_img_new(VFS301_FP_OUTPUT_WIDTH * vdev->scanline_count);
+	if (img == NULL)
+		return 0;
+	
+	vfs301_extract_image(vdev, img->data, &height);
+	
+	/* TODO: how to detect flip? should the resulting image be
+	 * oriented so that it is equal e.g. to a fingerprint on a paper,
+	 * or to the finger when I look at it?) */
+	img->flags = FP_IMG_COLORS_INVERTED | FP_IMG_V_FLIPPED;
+
+	img->width = VFS301_FP_OUTPUT_WIDTH;
+	img->height = height;
+	
+	img = fpi_img_resize(img, img->height * img->width);
+	fpi_imgdev_image_captured(dev, img);
+	
+	return 1;
 }
 
 /* Loop ssm states */
@@ -73,6 +101,7 @@ enum
 	M_WAIT_PRINT,
 	M_CHECK_PRINT,
 	M_READ_PRINT,
+	M_SUBMIT_PRINT,
 
 	/* Number of states */
 	M_LOOP_NUM_STATES,
@@ -82,11 +111,12 @@ enum
 static void m_loop_state(struct fpi_ssm *ssm)
 {
 	struct fp_img_dev *dev = ssm->priv;
-	vfs301_dev *vdev = dev->priv;
+	vfs301_dev_t *vdev = dev->priv;
 
 	switch (ssm->cur_state) {
 	case M_REQUEST_PRINT:
 		vfs301_proto_request_fingerprint(dev->udev, vdev);
+		fpi_ssm_next_state(ssm);
 		break;
 
 	case M_WAIT_PRINT:
@@ -94,14 +124,27 @@ static void m_loop_state(struct fpi_ssm *ssm)
 		async_sleep(200, ssm);
 		break;
 
-	case M_CHECK_PRINT:		
+	case M_CHECK_PRINT:
 		if (!vfs301_proto_peek_event(dev->udev, vdev))
 			fpi_ssm_jump_to_state(ssm, M_WAIT_PRINT);
+		else 
+			fpi_ssm_next_state(ssm);
 		break;
 		
 	case M_READ_PRINT:
+		fpi_imgdev_report_finger_status(dev, TRUE);
 		vfs301_proto_process_event(dev->udev, vdev);
-		fpi_ssm_mark_completed(ssm);
+		fpi_ssm_next_state(ssm);
+		break;
+	
+	case M_SUBMIT_PRINT:
+		if (submit_image(ssm)) {
+			fpi_ssm_mark_completed(ssm);
+			// NOTE: finger off is expected only after submitting image...
+			fpi_imgdev_report_finger_status(dev, FALSE);
+		} else {
+			fpi_ssm_jump_to_state(ssm, M_REQUEST_PRINT);
+		}
 		break;
 	}
 }
@@ -117,11 +160,13 @@ static void m_loop_complete(struct fpi_ssm *ssm)
 static void m_init_state(struct fpi_ssm *ssm)
 {
 	struct fp_img_dev *dev = ssm->priv;
-	vfs301_dev *vdev = dev->priv;
+	vfs301_dev_t *vdev = dev->priv;
 
 	assert(ssm->cur_state == 0);
 	
 	vfs301_proto_init(dev->udev, vdev);
+	
+	fpi_ssm_mark_completed(ssm);
 }
 
 /* Complete init sequential state machine */
@@ -170,8 +215,7 @@ static int dev_open(struct fp_img_dev *dev, unsigned long driver_data)
 
 	/* Claim usb interface */
 	r = libusb_claim_interface(dev->udev, 0);
-	if (r < 0)
-	{
+	if (r < 0) {
 		/* Interface not claimed, return error */
 		fp_err("could not claim interface 0");
 		return r;
@@ -184,7 +228,6 @@ static int dev_open(struct fp_img_dev *dev, unsigned long driver_data)
 	vdev = g_malloc0(sizeof(vfs301_dev_t));
 	dev->priv = vdev;
 
-	vdev->state = STATE_NOTHING;
 	vdev->scanline_buf = malloc(0);
 	vdev->scanline_count = 0;
 	
@@ -216,12 +259,12 @@ static const struct usb_id id_table[] =
 };
 
 /* Device driver definition */
-struct fp_img_driver vfs101_driver =
+struct fp_img_driver vfs301_driver =
 {
 	/* Driver specification */
 	.driver =
 	{
-		.id = 10,
+		.id = 11,
 		.name = FP_COMPONENT,
 		.full_name = "Validity VFS301",
 		.id_table = id_table,
