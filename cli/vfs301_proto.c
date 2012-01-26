@@ -322,8 +322,8 @@ static int img_process_data(
 	vfs301_line_t *lines = (vfs301_line_t*)buf;
 	int no_lines = len / sizeof(vfs301_line_t);
 	int i;
-	int no_nonempty;
-	char *cur_line;
+	/*int no_nonempty;*/
+	unsigned char *cur_line;
 	int last_img_height;
 #ifdef SCAN_FINISH_DETECTION
 	int finished_scan;
@@ -340,7 +340,7 @@ static int img_process_data(
 	dev->scanline_buf = realloc(dev->scanline_buf, dev->scanline_count * VFS301_FP_OUTPUT_WIDTH);
 	assert(dev->scanline_buf != NULL);
 	
-	for (cur_line = dev->scanline_buf + last_img_height * VFS301_FP_OUTPUT_WIDTH, no_nonempty = 0, i = 0; 
+	for (cur_line = dev->scanline_buf + last_img_height * VFS301_FP_OUTPUT_WIDTH, i = 0; 
 		i < no_lines; 
 		i++, cur_line += VFS301_FP_OUTPUT_WIDTH
 	) {
