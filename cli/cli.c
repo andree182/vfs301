@@ -65,9 +65,9 @@ static void usb_init(void)
 	}
 	state = STATE_INIT;
 
-	for (i = 0; i < sizeof(usb_ids_supported) / sizeof(usb_ids_supported[0]); i++) {
+	for (i = 0; i < (sizeof(usb_ids_supported) / sizeof(usb_ids_supported[0])); i++) {
 		devh = libusb_open_device_with_vid_pid(
-			NULL, usb_ids_supported[i][0], usb_ids_supported[i][1]
+			ctx, usb_ids_supported[i][0], usb_ids_supported[i][1]
 		);
 		if (devh != NULL)
 			break;
