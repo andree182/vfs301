@@ -33,6 +33,9 @@
 
 /************************** USB STUFF *****************************************/
 
+/* signal handler flag */
+static int last_signal = 0;
+
 /* init state of the usb subsystem */
 static enum {
 	STATE_NOTHING,
@@ -190,35 +193,40 @@ static void init(vfs301_dev_t *dev)
 		vfs301_proto_init(devh, dev);
 }
 
-static void work(vfs301_dev_t *dev)
-{
-	while (1) {
-		fprintf(stderr, "waiting for next fingerprint...\n");
-		vfs301_proto_request_fingerprint(devh, dev);
-		while (!vfs301_proto_peek_event(devh, dev))
-			usleep(200000);
-		
-		fprintf(stderr, "reading fingerprint...\n");
-		vfs301_proto_process_event(devh, dev);
-		
-		img_store(dev);
-	}
-}
-
 static void deinit(vfs301_dev_t *dev)
 {
 	vfs301_proto_deinit(devh, dev);
 	usb_deinit();
-	
+
 	free(dev->scanline_buf);
+}
+
+static void work(vfs301_dev_t *dev)
+{
+	while (last_signal == 0) {
+		fprintf(stderr, "waiting for next fingerprint...\n");
+		vfs301_proto_request_fingerprint(devh, dev);
+
+		while (last_signal == 0 && !vfs301_proto_peek_event(devh, dev)) {
+			usleep(200000);
+		}
+
+		if (last_signal == 0) {
+			fprintf(stderr, "reading fingerprint...\n");
+			vfs301_proto_process_event(devh, dev);
+
+			img_store(dev);
+		}
+	}
+
+	fprintf(stderr, "That was all, folks\n");
+	deinit(dev);
 }
 
 static void handle_signal(int sig)
 {
-	(void)sig;
-	
-	fprintf(stderr, "That was all, folks\n");
-	deinit(&dev);
+	if (last_signal == 0)
+		last_signal = sig;
 }
 
 int main(int argc, char **argv)
