@@ -203,6 +203,10 @@ static void deinit(vfs301_dev_t *dev)
 
 static void work(vfs301_dev_t *dev)
 {
+	int rv;
+	const char *progress[] = {"/\r", "-\r", "\\\r", "|\r", NULL};
+	const char **cprogress = progress;
+	
 	while (last_signal == 0) {
 		fprintf(stderr, "waiting for next fingerprint...\n");
 		vfs301_proto_request_fingerprint(devh, dev);
@@ -213,12 +217,33 @@ static void work(vfs301_dev_t *dev)
 
 		if (last_signal == 0) {
 			fprintf(stderr, "reading fingerprint...\n");
-			vfs301_proto_process_event(devh, dev);
+			vfs301_proto_process_event_start(devh, dev);
+			
+			rv = VFS301_ONGOING;
+			while (rv == VFS301_ONGOING) {
+				assert(libusb_handle_events(ctx) == 0);
+				
+				rv = vfs301_proto_process_event_poll(devh, dev);
+				
+				// fancy progress meter :)
+				fputs(*cprogress, stdout);
+				fflush(stdout);
+				cprogress++;
+				if (*cprogress == NULL)
+					cprogress = progress;
+				
+				if (rv == VFS301_FAILURE) {
+					fprintf(stderr, "There was some failure during fingerprint scan...\n");
+					goto exit;
+				}
+				usleep(2000);
+			}
 
 			img_store(dev);
 		}
 	}
 
+exit:
 	fprintf(stderr, "That was all, folks\n");
 	deinit(dev);
 }

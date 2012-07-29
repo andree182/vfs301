@@ -18,6 +18,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+/*
+ * TODO:
+ * - async communication everywhere :)
+ * - protocol decyphering
+ *   - what is needed and what is redundant
+ *   - is some part of the initial data the firmware?
+ *   - describe some interesting structures better
+ */
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
@@ -430,12 +438,47 @@ int vfs301_proto_peek_event(
 			a; \
 	}
 
-void vfs301_proto_process_event(
+static void vfs301_proto_process_event_cb(struct libusb_transfer *transfer)
+{
+	vfs301_dev_t *dev = transfer->user_data;
+	struct libusb_device_handle *devh = transfer->dev_handle;
+
+	if (transfer->status != LIBUSB_TRANSFER_COMPLETED) {
+		dev->recv_progress = VFS301_FAILURE;
+		goto end;
+	} else if (transfer->actual_length < dev->recv_exp_amt) {
+		// TODO: process the data anyway?
+		dev->recv_progress = VFS301_ENDED;
+		goto end;
+	} else {
+		dev->recv_len = transfer->actual_length;
+		if (!vfs301_proto_process_data(dev->recv_exp_amt == VFS301_FP_RECV_LEN_1, dev)) {
+			dev->recv_progress = VFS301_ENDED;
+			goto end;
+		}
+		
+		dev->recv_exp_amt = VFS301_FP_RECV_LEN_2;
+		libusb_fill_bulk_transfer(
+			transfer, devh, VFS301_RECEIVE_ENDPOINT_DATA,
+			dev->recv_buf, dev->recv_exp_amt,
+			vfs301_proto_process_event_cb, dev, VFS301_FP_RECV_TIMEOUT);
+		
+		if (libusb_submit_transfer(transfer) < 0) {
+			printf("cb::continue fail\n");
+			dev->recv_progress = VFS301_FAILURE;
+			goto end;
+		}
+		return;
+	}
+	
+end:
+	libusb_free_transfer(transfer);
+}
+
+void vfs301_proto_process_event_start(
 	struct libusb_device_handle *devh, vfs301_dev_t *dev)
 {
-	int first_block = 1;
-	int rv;
-	int to_recv;
+	struct libusb_transfer *transfer;
 	
 	/* 
 	 * Notes:
@@ -459,27 +502,40 @@ void vfs301_proto_process_event(
 	 *    o 2C01
 	 */
 	USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 64);
+	
 	/* now read the fingerprint data, while there are some */
-	while (1) {
-		to_recv = first_block ? 84032 : 84096;
-		
-		rv = USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, to_recv);
-		
-		if (rv == LIBUSB_ERROR_TIMEOUT)
-			break;
-		assert(rv == 0);
-		if (dev->recv_len < to_recv)
-			break;
-		
-		if (!vfs301_proto_process_data(first_block, dev))
-			break;
-		
-		first_block = 0;
+	transfer = libusb_alloc_transfer(0);
+	if (!transfer) {
+		dev->recv_progress = VFS301_FAILURE;
+		return;
 	}
+	
+	dev->recv_progress = VFS301_ONGOING;
+	dev->recv_exp_amt = VFS301_FP_RECV_LEN_1;
+	
+	libusb_fill_bulk_transfer(
+		transfer, devh, VFS301_RECEIVE_ENDPOINT_DATA,
+		dev->recv_buf, dev->recv_exp_amt,
+		vfs301_proto_process_event_cb, dev, VFS301_FP_RECV_TIMEOUT);
+	
+	if (libusb_submit_transfer(transfer) < 0) {
+		libusb_free_transfer(transfer);
+		dev->recv_progress = VFS301_FAILURE;
+		return;
+	}
+}
 
+int /* vfs301_dev_t::recv_progress */ vfs301_proto_process_event_poll(
+	struct libusb_device_handle *devh, vfs301_dev_t *dev)
+{
+	if (dev->recv_progress != VFS301_ENDED)
+		return dev->recv_progress;
+	
+	/* Finish the scan process... */
+	
 	USB_SEND(0x04, -1);
 	/* the following may come in random order, data may not come at all, don't
-	 * try for too long... */
+	* try for too long... */
 	VARIABLE_ORDER(
 		USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2), //1204
 		USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 16384)
@@ -490,6 +546,8 @@ void vfs301_proto_process_event(
 		USB_RECV(VFS301_RECEIVE_ENDPOINT_DATA, 5760), //seems to come always
 		USB_RECV(VFS301_RECEIVE_ENDPOINT_CTRL, 2) //0000
 	);
+	
+	return dev->recv_progress;
 }
 
 void vfs301_proto_init(struct libusb_device_handle *devh, vfs301_dev_t *dev)

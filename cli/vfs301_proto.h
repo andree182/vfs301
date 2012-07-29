@@ -27,6 +27,9 @@ enum {
 	VFS301_RECEIVE_ENDPOINT_DATA = 0x82
 };
 
+#define VFS301_FP_RECV_LEN_1 (84032)
+#define VFS301_FP_RECV_LEN_2 (84096)
+
 typedef struct {
 	/* buffer for received data */
 	unsigned char recv_buf[0x20000];
@@ -35,6 +38,13 @@ typedef struct {
 	/* buffer to hold raw scanlines */
 	unsigned char *scanline_buf;
 	int scanline_count;
+    
+    enum {
+		VFS301_ONGOING = 0,
+		VFS301_ENDED = 1,
+		VFS301_FAILURE = -1
+	} recv_progress;
+	int recv_exp_amt;
 } vfs301_dev_t;
 
 enum {
@@ -61,6 +71,9 @@ enum {
 
 	/* Minimum average difference between returned lines */
 	VFS301_FP_LINE_DIFF_THRESHOLD = 15,
+	
+	/* Maximum waiting time for a single fingerprint frame */
+	VFS301_FP_RECV_TIMEOUT = 2000
 };
 
 /* Arrays of this structure is returned during the initialization as a response 
@@ -115,7 +128,9 @@ void vfs301_proto_request_fingerprint(
 /** returns 0 if no event is ready, or 1 if there is one... */
 int vfs301_proto_peek_event(
 	struct libusb_device_handle *devh, vfs301_dev_t *dev);
-void vfs301_proto_process_event(
+void vfs301_proto_process_event_start(
+	struct libusb_device_handle *devh, vfs301_dev_t *dev);
+int vfs301_proto_process_event_poll(
 	struct libusb_device_handle *devh, vfs301_dev_t *dev);
 
 void vfs301_extract_image(
