@@ -1,3 +1,23 @@
+From b2733d426eb65246908bae201e3891f46c9c718d Mon Sep 17 00:00:00 2001
+From: Andrej Krutak <dev@andree.sk>
+Date: Sun, 22 Jul 2012 21:44:34 +0200
+Subject: [PATCH] add vfs301 driver
+
+---
+ configure.ac                               |   13 +-
+ libfprint/Makefile.am                      |    6 +
+ libfprint/core.c                           |    3 +
+ libfprint/drivers/vfs301.c                 |  306 ++++
+ libfprint/drivers/vfs301_proto.c           |  642 +++++++
+ libfprint/drivers/vfs301_proto.h           |  138 ++
+ libfprint/drivers/vfs301_proto_fragments.h | 2633 ++++++++++++++++++++++++++++
+ libfprint/fp_internal.h                    |    3 +
+ 8 files changed, 3743 insertions(+), 1 deletion(-)
+ create mode 100644 libfprint/drivers/vfs301.c
+ create mode 100644 libfprint/drivers/vfs301_proto.c
+ create mode 100644 libfprint/drivers/vfs301_proto.h
+ create mode 100644 libfprint/drivers/vfs301_proto_fragments.h
+
 diff --git a/configure.ac b/configure.ac
 index 1d57e4e..04bfc9b 100644
 --- a/configure.ac
@@ -97,14 +117,15 @@ index 401c491..a9cd8ef 100644
  #endif
 diff --git a/libfprint/drivers/vfs301.c b/libfprint/drivers/vfs301.c
 new file mode 100644
-index 0000000..4945c0d
+index 0000000..ef47f6c
 --- /dev/null
 +++ b/libfprint/drivers/vfs301.c
-@@ -0,0 +1,305 @@
+@@ -0,0 +1,306 @@
 +/*
-+ * vfs301 fingerprint driver 
-+ * 
-+ * Copyright (c) 2011 Andrej Krutak <dev@andree.sk>
++ * vfs301/vfs300 fingerprint reader driver
++ * https://github.com/andree182/vfs301
++ *  
++ * Copyright (c) 2011-2012 Andrej Krutak <dev@andree.sk>
 + *
 + * This library is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU Lesser General Public
@@ -408,14 +429,15 @@ index 0000000..4945c0d
 +};
 diff --git a/libfprint/drivers/vfs301_proto.c b/libfprint/drivers/vfs301_proto.c
 new file mode 100644
-index 0000000..555f6da
+index 0000000..3d3a038
 --- /dev/null
 +++ b/libfprint/drivers/vfs301_proto.c
-@@ -0,0 +1,641 @@
+@@ -0,0 +1,642 @@
 +/*
-+ * vfs301 fingerprint driver 
-+ * 
-+ * Copyright (c) 2011 Andrej Krutak <dev@andree.sk>
++ * vfs301/vfs300 fingerprint reader driver
++ * https://github.com/andree182/vfs301
++ *  
++ * Copyright (c) 2011-2012 Andrej Krutak <dev@andree.sk>
 + *
 + * This library is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU Lesser General Public
@@ -1055,14 +1077,15 @@ index 0000000..555f6da
 +}
 diff --git a/libfprint/drivers/vfs301_proto.h b/libfprint/drivers/vfs301_proto.h
 new file mode 100644
-index 0000000..ede65e0
+index 0000000..d962064
 --- /dev/null
 +++ b/libfprint/drivers/vfs301_proto.h
-@@ -0,0 +1,137 @@
+@@ -0,0 +1,138 @@
 +/*
-+ * vfs301 fingerprint driver
-+ * 
-+ * Copyright (c) 2011 Andrej Krutak <dev@andree.sk>
++ * vfs301/vfs300 fingerprint reader driver
++ * https://github.com/andree182/vfs301
++ *  
++ * Copyright (c) 2011-2012 Andrej Krutak <dev@andree.sk>
 + *
 + * This library is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU Lesser General Public
@@ -1198,14 +1221,15 @@ index 0000000..ede65e0
 +	vfs301_dev_t *vfs, unsigned char *output, int *output_height);
 diff --git a/libfprint/drivers/vfs301_proto_fragments.h b/libfprint/drivers/vfs301_proto_fragments.h
 new file mode 100644
-index 0000000..671aa5d
+index 0000000..a9ffa77
 --- /dev/null
 +++ b/libfprint/drivers/vfs301_proto_fragments.h
-@@ -0,0 +1,2632 @@
+@@ -0,0 +1,2633 @@
 +/*
-+ * vfs301 fingerprint driver
-+ * 
-+ * Copyright (c) 2011 Andrej Krutak <dev@andree.sk>
++ * vfs301/vfs300 fingerprint reader driver
++ * https://github.com/andree182/vfs301
++ *  
++ * Copyright (c) 2011-2012 Andrej Krutak <dev@andree.sk>
 + *
 + * This library is free software; you can redistribute it and/or
 + * modify it under the terms of the GNU Lesser General Public
@@ -3848,3 +3872,6 @@ index e6134d4..886ad52 100644
  
  extern libusb_context *fpi_usb_ctx;
  extern GSList *opened_devices;
+-- 
+1.7.9.5
+

@@ -43,8 +43,6 @@ cd cli
 make
 ./cli
 Ctrl+C
-Ctrl+Z
-kill %
 
 ...yes, it's a bit flakey (wasn't really in mood yet to do it properly:-))
 
