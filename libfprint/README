@@ -1,6 +1,4 @@
-Copy the files libfprint/vfs301.c cli/vfs301_*.* from this driver directory to 
-the libfprint directory libfprint/drivers (just files, not into subdirectories).
 Apply the patch libfprintf/integrate_vfs301.patch to the libfprint sources.
 
-Then just do ./autogen.sh and make - and the examples/enroll and examples/verify
-utilities should do stuff :-)
+Then just do (./autogen.sh if there are some problems, and) make - and the 
+examples/enroll and examples/verify utilities should do stuff :-)
